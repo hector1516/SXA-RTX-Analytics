@@ -1,5 +1,5 @@
 ﻿<!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 
 <head>
     <meta charset="utf-8" />
@@ -16,6 +16,31 @@
 
 <body>
     <Routes />
+
+    <!-- Modal de reconexión en español (reemplaza "Rejoining the server...") -->
+    <div id="components-reconnect-modal" class="components-reconnect-hide">
+        <div class="components-reconnect-current">
+            <div style="display:flex;align-items:center;gap:.75rem;justify-content:center;padding:1rem">
+                <span class="spinner-border spinner-border-sm" role="status"></span>
+                <span>Reconectando con el servidor...</span>
+            </div>
+        </div>
+        <div class="components-reconnect-failed">
+            <div style="text-align:center;padding:1rem">
+                <div class="fw-bold">No se pudo reconectar</div>
+                <div class="small text-muted">Intenta recargar la página.</div>
+                <button class="btn btn-primary btn-sm mt-2" onclick="window.Blazor.reconnect()">Reintentar</button>
+            </div>
+        </div>
+        <div class="components-reconnect-rejected">
+            <div style="text-align:center;padding:1rem">
+                <div class="fw-bold">Conexión rechazada</div>
+                <div class="small text-muted">Recarga la página para continuar.</div>
+                <button class="btn btn-primary btn-sm mt-2" onclick="location.reload()">Recargar</button>
+            </div>
+        </div>
+    </div>
+
     <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
 
