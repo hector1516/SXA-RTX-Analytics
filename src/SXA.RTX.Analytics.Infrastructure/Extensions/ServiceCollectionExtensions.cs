@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using SXA.RTX.Analytics.Application.Abstractions;
 using SXA.RTX.Analytics.Infrastructure.Persistence;
+using SXA.RTX.Analytics.Infrastructure.Services;
 
 namespace SXA.RTX.Analytics.Infrastructure.Extensions;
 
@@ -30,6 +32,7 @@ public static class ServiceCollectionExtensions
                 }));
         }
 
+        services.AddScoped<ISystemTableService, SqlSystemTableService>();
         return services;
     }
 }

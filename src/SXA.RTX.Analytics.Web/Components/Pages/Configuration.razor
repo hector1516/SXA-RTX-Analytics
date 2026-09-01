@@ -1,0 +1,288 @@
+@page "/configuration"
+@rendermode InteractiveServer
+@using SXA.RTX.Analytics.Application.Abstractions
+@inject ISystemTableService SystemService
+@inject IConfiguration Config
+
+<PageTitle>Configuración — SXA-RTX Analytics</PageTitle>
+
+<div class="d-flex flex-wrap gap-3 align-items-center justify-content-between mb-3">
+    <div>
+        <h2 class="mb-1" style="font-weight:800; letter-spacing:-.02em">Configuración</h2>
+        <div class="text-muted small">Servidor SQL • MAPICS (ODBC) • Tablas del sistema <code>SXA_RTX_*</code></div>
+    </div>
+    <div class="d-flex gap-2">
+        <span class="rtx-pill rtx-pill--sky">Solo sistema</span>
+        <span class="rtx-pill rtx-pill--honey">Discreto ECCSA → Hussmann</span>
+    </div>
+</div>
+
+<ul class="nav nav-pills mb-4" role="tablist">
+    <li class="nav-item"><button class="nav-link @(ActiveTab==0?"active":"")" @onclick="() => ActiveTab=0">SQL Server</button></li>
+    <li class="nav-item"><button class="nav-link @(ActiveTab==1?"active":"")" @onclick="() => ActiveTab=1">MAPICS (ODBC)</button></li>
+    <li class="nav-item"><button class="nav-link @(ActiveTab==2?"active":"")" @onclick="() => ActiveTab=2">Tablas del sistema</button></li>
+</ul>
+
+@if (ActiveTab == 0)
+{
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">SQL Server — Conexión principal</h5>
+            <p class="text-muted small">Usada para <code>ConfigurationDatabase (SXA_RTX_Analytics)</code> y para listar “carpetas” (bases de datos). Credencial recomendada: solo lectura para reporting.</p>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Servidor</label>
+                    <input class="form-control" @bind="SqlServer" placeholder="SRVSQL01\SQLEXPRESS o 10.0.0.5" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Autenticación</label>
+                    <select class="form-select" @bind="SqlAuth">
+                        <option value="sql">SQL Server</option>
+                        <option value="win">Windows (Trusted)</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end gap-2">
+                    <div class="form-check"><input class="form-check-input" type="checkbox" @bind="SqlEncrypt" id="enc"><label class="form-check-label" for="enc">Encrypt</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" @bind="SqlTrust" id="trust"><label class="form-check-label" for="trust">Trust cert</label></div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Base de configuración</label>
+                    <input class="form-control" @bind="SqlDatabase" placeholder="SXA_RTX_Analytics" />
+                    <div class="form-text">Si está vacío usa InMemory (scaffold).</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Usuario</label>
+                    <input class="form-control" @bind="SqlUser" disabled="@(SqlAuth=="win")" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Contraseña</label>
+                    <input type="password" class="form-control" @bind="SqlPassword" disabled="@(SqlAuth=="win")" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Cadena resultante (no se loguea)</label>
+                    <input class="form-control font-monospace small" value="@BuildSqlConnectionString()" readonly />
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-primary" @onclick="TestSql" disabled="@IsTestingSql">
+                    @if (IsTestingSql) { <span class="spinner-border spinner-border-sm"></span> @(" Probando...") } else { @("Probar conexión") }
+                </button>
+                <button class="btn btn-outline-primary" @onclick="LoadDatabases" disabled="@(!SqlTestOk)">Cargar bases (carpetas)</button>
+            </div>
+            @if (!string.IsNullOrEmpty(SqlTestMsg))
+            {
+                <div class="alert @(SqlTestOk ? "alert-success" : "alert-danger") mt-3 py-2 small">@SqlTestMsg</div>
+            }
+
+            @if (Databases.Count > 0)
+            {
+                <hr />
+                <h6>Carpetas / Bases de datos disponibles</h6>
+                <p class="text-muted small">Selecciona las “carpetas a usar de datos” — solo informativo en Fase 1 (se persistirá en DataSources).</p>
+                <div class="row g-2">
+                    @foreach (var db in Databases)
+                    {
+                        <div class="col-md-4">
+                            <label class="d-flex align-items-center gap-2 border rounded-3 p-2 bg-white">
+                                <input type="checkbox" @bind="db.IsSelected" />
+                                <span class="small">@db.Name</span>
+                            </label>
+                        </div>
+                    }
+                </div>
+                <div class="text-muted small mt-2">@Databases.Count(b => b.IsSelected) seleccionadas</div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(Config.GetConnectionString("ConfigurationDatabase")))
+            {
+                <div class="alert alert-info mt-3 small">Actual <code>ConfigurationDatabase</code> configurada (oculta). Usa User Secrets para cambiarla.</div>
+            }
+        </div>
+    </div>
+}
+else if (ActiveTab == 1)
+{
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">MAPICS — ODBC</h5>
+            <p class="text-muted small">Dataset ODBC para MAPICS. Se usará <code>OdbcDataSourceProvider</code> en Fase 6.</p>
+            <label class="form-label">Cadena ODBC</label>
+            <input class="form-control font-monospace small" @bind="OdbcConnectionString" placeholder="DSN=MAPICS;UID=...;PWD=...;" />
+            <div class="form-text">Ejemplo: <code>DSN=MAPICS_PROD;UID=readonly;PWD=***;</code> — usa cuenta de solo lectura.</div>
+            <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-primary" @onclick="TestOdbc" disabled="@IsTestingOdbc">
+                    @if (IsTestingOdbc) { <span class="spinner-border spinner-border-sm"></span> @(" Probando...") } else { @("Probar ODBC") }
+                </button>
+            </div>
+            @if (!string.IsNullOrEmpty(OdbcTestMsg))
+            {
+                <div class="alert @(OdbcTestOk ? "alert-success" : "alert-danger") mt-3 py-2 small">@OdbcTestMsg</div>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                    <h5 class="card-title mb-1">Tablas del sistema <code>SXA_RTX_*</code></h5>
+                    <div class="text-muted small">Solo estas tablas se pueden crear desde aquí (no operacionales). Prefijo relacionado con la app.</div>
+                </div>
+                <button class="btn btn-primary btn-sm" @onclick="CreateAll" disabled="@IsCreatingAll">Crear faltantes</button>
+            </div>
+
+            @if (IsLoadingTables)
+            {
+                <div class="text-center py-4"><div class="spinner-border"></div><div class="small text-muted mt-2">Cargando estado…</div></div>
+            }
+            else if (Tables.Count == 0)
+            {
+                <div class="alert alert-warning mt-3">No se pudo cargar el estado. Verifica la conexión SQL.</div>
+            }
+            else
+            {
+                <div class="table-responsive mt-3">
+                    <table class="table table-hover align-middle small">
+                        <thead>
+                            <tr><th>Tabla</th><th>Propósito</th><th>Estado</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var t in Tables)
+                            {
+                                <tr>
+                                    <td class="font-monospace"><span class="rtx-pill">@t.TableName</span></td>
+                                    <td class="text-muted">@t.Purpose</td>
+                                    <td>
+                                        @if (t.Exists)
+                                        {
+                                            <span class="badge bg-success">Existe</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-warning text-dark">Falta</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!t.Exists)
+                                        {
+                                            <button class="btn btn-sm btn-outline-primary" @onclick="() => CreateOne(t.TableName)" disabled="@Creating.Contains(t.TableName)">
+                                                @(Creating.Contains(t.TableName) ? "Creando..." : "Crear")
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">OK</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            @if (!string.IsNullOrEmpty(TableMsg))
+            {
+                <div class="alert @(TableOk ? "alert-success" : "alert-danger") mt-3 py-2 small">@TableMsg</div>
+            }
+            <div class="alert alert-light border small mt-3">
+                <strong>Nota:</strong> En modo scaffold (InMemory) la creación se simula. Con SQL Server real se ejecuta <code>CREATE TABLE IF NOT EXISTS</code> con <code>dbo.SXA_RTX_*</code>.
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    int ActiveTab = 0;
+
+    // SQL
+    string SqlServer = "localhost";
+    string SqlDatabase = "SXA_RTX_Analytics";
+    string SqlAuth = "sql";
+    string SqlUser = "";
+    string SqlPassword = "";
+    bool SqlEncrypt = true;
+    bool SqlTrust = true;
+    bool IsTestingSql = false;
+    bool SqlTestOk = false;
+    string? SqlTestMsg;
+    List<DatabaseOptionMutable> Databases = new();
+
+    // ODBC
+    string OdbcConnectionString = "DSN=MAPICS;";
+    bool IsTestingOdbc = false;
+    bool OdbcTestOk = false;
+    string? OdbcTestMsg;
+
+    // Tables
+    List<SystemTableStatus> Tables = new();
+    bool IsLoadingTables = false;
+    bool IsCreatingAll = false;
+    HashSet<string> Creating = new();
+    string? TableMsg;
+    bool TableOk = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTables();
+    }
+
+    string BuildSqlConnectionString()
+    {
+        if (SqlAuth == "win")
+            return $"Server={SqlServer};Database={SqlDatabase};Trusted_Connection=True;Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};";
+        return $"Server={SqlServer};Database={SqlDatabase};User Id={SqlUser};Password=***;Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};";
+    }
+    string BuildSqlConnectionStringReal()
+    {
+        if (SqlAuth == "win")
+            return $"Server={SqlServer};Database={SqlDatabase};Trusted_Connection=True;Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};";
+        return $"Server={SqlServer};Database={SqlDatabase};User Id={SqlUser};Password={SqlPassword};Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};";
+    }
+
+    async Task TestSql()
+    {
+        IsTestingSql = true; SqlTestMsg = null;
+        var cs = BuildSqlConnectionStringReal();
+        var (ok, msg) = await SystemService.TestSqlConnectionAsync(cs);
+        SqlTestOk = ok; SqlTestMsg = msg; IsTestingSql = false;
+    }
+    async Task LoadDatabases()
+    {
+        var cs = BuildSqlConnectionStringReal();
+        var list = await SystemService.ListDatabasesAsync(cs);
+        Databases = list.Select(n => new DatabaseOptionMutable { Name = n, IsSelected = false }).ToList();
+        if (Databases.Count == 0) SqlTestMsg = (SqlTestMsg ?? "") + " (sin bases o sin permisos sys.databases)";
+    }
+    async Task TestOdbc()
+    {
+        IsTestingOdbc = true; OdbcTestMsg = null;
+        var (ok, msg) = await SystemService.TestOdbcConnectionAsync(OdbcConnectionString);
+        OdbcTestOk = ok; OdbcTestMsg = msg; IsTestingOdbc = false;
+    }
+    async Task LoadTables()
+    {
+        IsLoadingTables = true;
+        Tables = (await SystemService.GetSystemTablesStatusAsync()).ToList();
+        IsLoadingTables = false;
+    }
+    async Task CreateOne(string table)
+    {
+        Creating.Add(table);
+        var (ok, msg) = await SystemService.CreateTableAsync(table);
+        TableOk = ok; TableMsg = msg; Creating.Remove(table);
+        await LoadTables();
+    }
+    async Task CreateAll()
+    {
+        IsCreatingAll = true;
+        var (ok, msg) = await SystemService.CreateAllMissingAsync();
+        TableOk = ok; TableMsg = msg; IsCreatingAll = false;
+        await LoadTables();
+    }
+
+    class DatabaseOptionMutable { public string Name { get; set; } = ""; public bool IsSelected { get; set; } }
+}
