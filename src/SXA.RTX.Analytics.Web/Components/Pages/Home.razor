@@ -1,0 +1,58 @@
+﻿@page "/"
+@using Microsoft.Extensions.Diagnostics.HealthChecks
+
+<PageTitle>SXA-RTX Analytics</PageTitle>
+
+<h1>SXA-RTX Analytics</h1>
+
+<p class="lead">
+    Plataforma interna de reporting y análisis — scaffold Fase 1.
+</p>
+
+<div class="alert alert-success" role="alert">
+    <strong>Bootstrap completado.</strong> La aplicación compila, arranca y expone <code>/health</code>.
+</div>
+
+<div class="row g-3 mt-2">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Arquitectura</h5>
+                <p class="card-text">Domain / Application / Infrastructure / Reporting / Web — separación limpia y testeable.</p>
+                <a href="/health" target="_blank" class="btn btn-sm btn-outline-primary">Ver /health</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Reporting Engine</h5>
+                <p class="card-text">Abstracción <code>IDataSourceProvider</code> lista para SQL Server y ODBC (MAPICS) sin acoplar a Blazor.</p>
+                <code>DataSource → Query → QueryResult → Report → Visualization → Dashboard</code>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Próximos pasos</h5>
+                <ul class="mb-0">
+                    <li>Configurar <code>ConnectionStrings:ConfigurationDatabase</code> vía User Secrets</li>
+                    <li>Ejecutar <code>dotnet ef migrations add Initial</code></li>
+                    <li>Implementar DataSources / Reports / autenticación</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<hr class="my-4" />
+
+<h4>Estado del sistema</h4>
+<p>
+    Health: <a href="/health" target="_blank">/health</a> — Liveness: <a href="/health/live" target="_blank">/health/live</a>
+</p>
+<p class="text-muted">
+    Si <code>ConfigurationDatabase</code> está vacío la aplicación usa un store en memoria para que el scaffold arranque sin SQL Server.
+    En producción debe configurarse una cadena SQL Server real (cuenta de solo lectura para reporting).
+</p>
