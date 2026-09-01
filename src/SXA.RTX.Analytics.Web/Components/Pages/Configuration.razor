@@ -1,7 +1,10 @@
 @page "/configuration"
 @rendermode InteractiveServer
 @using SXA.RTX.Analytics.Application.Abstractions
+@using SXA.RTX.Analytics.Domain.Enums
 @inject ISystemTableService SystemService
+@inject IEquipoService EquipoService
+@inject ITablasConfigService TablasService
 @inject IConfiguration Config
 
 <PageTitle>Configuración — SXA-RTX Analytics</PageTitle>
@@ -9,18 +12,20 @@
 <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between mb-3">
     <div>
         <h2 class="mb-1" style="font-weight:800; letter-spacing:-.02em">Configuración</h2>
-        <div class="text-muted small">Servidor SQL • MAPICS (ODBC) • Tablas del sistema <code>SXA_RTX_*</code></div>
+        <div class="text-muted small">SQL Server • MAPICS (ODBC) • Sistema <code>SXA_RTX_*</code> • Equipos • Tablas VTI/VTech</div>
     </div>
     <div class="d-flex gap-2">
         <span class="rtx-pill rtx-pill--sky">Solo sistema</span>
-        <span class="rtx-pill rtx-pill--honey">Discreto ECCSA → Hussmann</span>
+        <span class="rtx-pill rtx-pill--honey">DeviceId PC-...</span>
     </div>
 </div>
 
-<ul class="nav nav-pills mb-4" role="tablist">
+<ul class="nav nav-pills mb-4 flex-wrap" role="tablist">
     <li class="nav-item"><button class="nav-link @(ActiveTab==0?"active":"")" @onclick="() => ActiveTab=0">SQL Server</button></li>
     <li class="nav-item"><button class="nav-link @(ActiveTab==1?"active":"")" @onclick="() => ActiveTab=1">MAPICS (ODBC)</button></li>
-    <li class="nav-item"><button class="nav-link @(ActiveTab==2?"active":"")" @onclick="() => ActiveTab=2">Tablas del sistema</button></li>
+    <li class="nav-item"><button class="nav-link @(ActiveTab==2?"active":"")" @onclick="() => ActiveTab=2">Tablas sistema</button></li>
+    <li class="nav-item"><button class="nav-link @(ActiveTab==3?"active":"")" @onclick="() => { ActiveTab=3; _ = LoadEquipos(); }">Equipos</button></li>
+    <li class="nav-item"><button class="nav-link @(ActiveTab==4?"active":"")" @onclick="() => { ActiveTab=4; _ = LoadTablas(); }">Tablas VTI/VTech</button></li>
 </ul>
 
 @if (ActiveTab == 0)
@@ -28,77 +33,23 @@
     <div class="card">
         <div class="card-body">
             <h5 class="card-title">SQL Server — Conexión principal</h5>
-            <p class="text-muted small">Usada para <code>ConfigurationDatabase (SXA_RTX_Analytics)</code> y para listar “carpetas” (bases de datos). Credencial recomendada: solo lectura para reporting.</p>
-
+            <p class="text-muted small">Usada para <code>ConfigurationDatabase (SXA_RTX_Analytics)</code> y para listar “carpetas” (bases) y catálogo <code>SXA_PCs</code>. Credencial solo lectura recomendada.</p>
             <div class="row g-3">
-                <div class="col-md-6">
-                    <label class="form-label">Servidor</label>
-                    <input class="form-control" @bind="SqlServer" placeholder="SRVSQL01\SQLEXPRESS o 10.0.0.5" />
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Autenticación</label>
-                    <select class="form-select" @bind="SqlAuth">
-                        <option value="sql">SQL Server</option>
-                        <option value="win">Windows (Trusted)</option>
-                    </select>
-                </div>
-                <div class="col-md-3 d-flex align-items-end gap-2">
-                    <div class="form-check"><input class="form-check-input" type="checkbox" @bind="SqlEncrypt" id="enc"><label class="form-check-label" for="enc">Encrypt</label></div>
-                    <div class="form-check"><input class="form-check-input" type="checkbox" @bind="SqlTrust" id="trust"><label class="form-check-label" for="trust">Trust cert</label></div>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Base de configuración</label>
-                    <input class="form-control" @bind="SqlDatabase" placeholder="SXA_RTX_Analytics" />
-                    <div class="form-text">Si está vacío usa InMemory (scaffold).</div>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Usuario</label>
-                    <input class="form-control" @bind="SqlUser" disabled="@(SqlAuth=="win")" />
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Contraseña</label>
-                    <input type="password" class="form-control" @bind="SqlPassword" disabled="@(SqlAuth=="win")" />
-                </div>
-                <div class="col-12">
-                    <label class="form-label">Cadena resultante (no se loguea)</label>
-                    <input class="form-control font-monospace small" value="@BuildSqlConnectionString()" readonly />
-                </div>
+                <div class="col-md-6"><label class="form-label">Servidor</label><input class="form-control" @bind="SqlServer" placeholder="SRVSQL01\SQLEXPRESS" /></div>
+                <div class="col-md-3"><label class="form-label">Autenticación</label><select class="form-select" @bind="SqlAuth"><option value="sql">SQL Server</option><option value="win">Windows</option></select></div>
+                <div class="col-md-3 d-flex align-items-end gap-2"><div class="form-check"><input class="form-check-input" type="checkbox" @bind="SqlEncrypt" id="enc"><label class="form-check-label" for="enc">Encrypt</label></div><div class="form-check"><input class="form-check-input" type="checkbox" @bind="SqlTrust" id="trust"><label class="form-check-label" for="trust">Trust cert</label></div></div>
+                <div class="col-md-6"><label class="form-label">Base de configuración</label><input class="form-control" @bind="SqlDatabase" placeholder="SXA_RTX_Analytics" /></div>
+                <div class="col-md-3"><label class="form-label">Usuario</label><input class="form-control" @bind="SqlUser" disabled="@(SqlAuth=="win")" /></div>
+                <div class="col-md-3"><label class="form-label">Contraseña</label><input type="password" class="form-control" @bind="SqlPassword" disabled="@(SqlAuth=="win")" /></div>
+                <div class="col-12"><label class="form-label">Cadena resultante (no se loguea)</label><input class="form-control font-monospace small" value="@BuildSqlConnectionString()" readonly /></div>
             </div>
-
             <div class="d-flex gap-2 mt-3">
-                <button class="btn btn-primary" @onclick="TestSql" disabled="@IsTestingSql">
-                    @if (IsTestingSql) { <span class="spinner-border spinner-border-sm"></span> @(" Probando...") } else { @("Probar conexión") }
-                </button>
+                <button class="btn btn-primary" @onclick="TestSql" disabled="@IsTestingSql">@if (IsTestingSql) { <span class="spinner-border spinner-border-sm"></span> @(" Probando...") } else { @("Probar conexión") }</button>
                 <button class="btn btn-outline-primary" @onclick="LoadDatabases" disabled="@(!SqlTestOk)">Cargar bases (carpetas)</button>
+                <button class="btn btn-outline-secondary" @onclick="() => { ActiveTab=3; _ = LoadEquipos(); }">Ir a Equipos →</button>
             </div>
-            @if (!string.IsNullOrEmpty(SqlTestMsg))
-            {
-                <div class="alert @(SqlTestOk ? "alert-success" : "alert-danger") mt-3 py-2 small">@SqlTestMsg</div>
-            }
-
-            @if (Databases.Count > 0)
-            {
-                <hr />
-                <h6>Carpetas / Bases de datos disponibles</h6>
-                <p class="text-muted small">Selecciona las “carpetas a usar de datos” — solo informativo en Fase 1 (se persistirá en DataSources).</p>
-                <div class="row g-2">
-                    @foreach (var db in Databases)
-                    {
-                        <div class="col-md-4">
-                            <label class="d-flex align-items-center gap-2 border rounded-3 p-2 bg-white">
-                                <input type="checkbox" @bind="db.IsSelected" />
-                                <span class="small">@db.Name</span>
-                            </label>
-                        </div>
-                    }
-                </div>
-                <div class="text-muted small mt-2">@Databases.Count(b => b.IsSelected) seleccionadas</div>
-            }
-
-            @if (!string.IsNullOrWhiteSpace(Config.GetConnectionString("ConfigurationDatabase")))
-            {
-                <div class="alert alert-info mt-3 small">Actual <code>ConfigurationDatabase</code> configurada (oculta). Usa User Secrets para cambiarla.</div>
-            }
+            @if (!string.IsNullOrEmpty(SqlTestMsg)) { <div class="alert @(SqlTestOk ? "alert-success" : "alert-danger") mt-3 py-2 small">@SqlTestMsg</div> }
+            @if (Databases.Count > 0) { <hr /><h6>Carpetas / Bases disponibles</h6><div class="row g-2">@foreach (var db in Databases) { <div class="col-md-4"><label class="d-flex align-items-center gap-2 border rounded-3 p-2 bg-white"><input type="checkbox" @bind="db.IsSelected" /><span class="small">@db.Name</span></label></div> }</div><div class="text-muted small mt-2">@Databases.Count(b => b.IsSelected) seleccionadas</div> }
         </div>
     </div>
 }
@@ -107,90 +58,120 @@ else if (ActiveTab == 1)
     <div class="card">
         <div class="card-body">
             <h5 class="card-title">MAPICS — ODBC</h5>
-            <p class="text-muted small">Dataset ODBC para MAPICS. Se usará <code>OdbcDataSourceProvider</code> en Fase 6.</p>
-            <label class="form-label">Cadena ODBC</label>
-            <input class="form-control font-monospace small" @bind="OdbcConnectionString" placeholder="DSN=MAPICS;UID=...;PWD=...;" />
-            <div class="form-text">Ejemplo: <code>DSN=MAPICS_PROD;UID=readonly;PWD=***;</code> — usa cuenta de solo lectura.</div>
-            <div class="d-flex gap-2 mt-3">
-                <button class="btn btn-primary" @onclick="TestOdbc" disabled="@IsTestingOdbc">
-                    @if (IsTestingOdbc) { <span class="spinner-border spinner-border-sm"></span> @(" Probando...") } else { @("Probar ODBC") }
-                </button>
-            </div>
-            @if (!string.IsNullOrEmpty(OdbcTestMsg))
-            {
-                <div class="alert @(OdbcTestOk ? "alert-success" : "alert-danger") mt-3 py-2 small">@OdbcTestMsg</div>
-            }
+            <p class="text-muted small">Dataset ODBC para MAPICS. Se usará <code>OdbcDataSourceProvider</code>.</p>
+            <label class="form-label">Cadena ODBC</label><input class="form-control font-monospace small" @bind="OdbcConnectionString" placeholder="DSN=MAPICS;UID=...;PWD=...;" />
+            <div class="d-flex gap-2 mt-3"><button class="btn btn-primary" @onclick="TestOdbc" disabled="@IsTestingOdbc">@if (IsTestingOdbc) { <span class="spinner-border spinner-border-sm"></span> @(" Probando...") } else { @("Probar ODBC") }</button></div>
+            @if (!string.IsNullOrEmpty(OdbcTestMsg)) { <div class="alert @(OdbcTestOk ? "alert-success" : "alert-danger") mt-3 py-2 small">@OdbcTestMsg</div> }
         </div>
     </div>
 }
-else
+else if (ActiveTab == 2)
 {
     <div class="card">
         <div class="card-body">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                <div>
-                    <h5 class="card-title mb-1">Tablas del sistema <code>SXA_RTX_*</code></h5>
-                    <div class="text-muted small">Solo estas tablas se pueden crear desde aquí (no operacionales). Prefijo relacionado con la app.</div>
-                </div>
+                <div><h5 class="card-title mb-1">Tablas del sistema <code>SXA_RTX_*</code></h5><div class="text-muted small">Solo estas se crean desde aquí.</div></div>
                 <button class="btn btn-primary btn-sm" @onclick="CreateAll" disabled="@IsCreatingAll">Crear faltantes</button>
             </div>
+            @if (IsLoadingTables) { <div class="text-center py-4"><div class="spinner-border"></div></div> }
+            else { <div class="table-responsive mt-3"><table class="table table-hover align-middle small"><thead><tr><th>Tabla</th><th>Propósito</th><th>Estado</th><th></th></tr></thead><tbody>@foreach (var t in Tables) { <tr><td class="font-monospace"><span class="rtx-pill">@t.TableName</span></td><td class="text-muted">@t.Purpose</td><td>@if (t.Exists) { <span class="badge bg-success">Existe</span> } else { <span class="badge bg-warning text-dark">Falta</span> }</td><td>@if (!t.Exists) { <button class="btn btn-sm btn-outline-primary" @onclick="() => CreateOne(t.TableName)" disabled="@Creating.Contains(t.TableName)">@(Creating.Contains(t.TableName) ? "Creando..." : "Crear")</button> } else { <span class="text-muted small">OK</span> }</td></tr> }</tbody></table></div> }
+            @if (!string.IsNullOrEmpty(TableMsg)) { <div class="alert @(TableOk ? "alert-success" : "alert-danger") mt-3 py-2 small">@TableMsg</div> }
+        </div>
+    </div>
+}
+else if (ActiveTab == 3)
+{
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Equipos — mapeo <code>DeviceId (PC-...)</code> → Nombre + Área</h5>
+            <p class="text-muted small">El <code>DeviceId</code> y <code>Tipo (VTI/VTech)</code> se traen del central de Sync (<code>dbo.SXA_PCs.TipoMaquina</code>). Aquí solo asignas <strong>Nombre</strong> y <strong>Área</strong>. Se usa en toda la app.</p>
 
-            @if (IsLoadingTables)
-            {
-                <div class="text-center py-4"><div class="spinner-border"></div><div class="small text-muted mt-2">Cargando estado…</div></div>
-            }
-            else if (Tables.Count == 0)
-            {
-                <div class="alert alert-warning mt-3">No se pudo cargar el estado. Verifica la conexión SQL.</div>
-            }
+            <div class="row g-3 p-3 border rounded-3 bg-light">
+                <div class="col-md-4">
+                    <label class="form-label">DeviceId (PC-...)</label>
+                    <select class="form-select font-monospace small" @bind="EqDeviceId">
+                        <option value="">— selecciona —</option>
+                        @foreach (var d in Catalog)
+                        {
+                            <option value="@d.DeviceId">@d.DeviceId — @d.NombrePC (@d.TipoMaquina)</option>
+                        }
+                    </select>
+                    <div class="form-text">Trae Tipo automático.</div>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Tipo (solo lectura)</label>
+                    <input class="form-control" value="@Catalog.FirstOrDefault(x=>x.DeviceId==EqDeviceId)?.TipoMaquina" readonly />
+                </div>
+                <div class="col-md-3"><label class="form-label">Nombre</label><input class="form-control" @bind="EqNombre" placeholder="Ej. Línea 3 - Celda 1" /></div>
+                <div class="col-md-3"><label class="form-label">Área</label><input class="form-control" @bind="EqArea" placeholder="Ej. Producción / HVAC" list="areasList" /><datalist id="areasList">@foreach (var a in Areas.Distinct()) { <option value="@a"></option> }</datalist></div>
+                <div class="col-12 d-flex gap-2">
+                    <button class="btn btn-primary" @onclick="SaveEquipo" disabled="@IsSavingEquipo">@if (IsSavingEquipo) { <span class="spinner-border spinner-border-sm"></span> } else { @("Guardar") }</button>
+                    <button class="btn btn-outline-secondary" @onclick="LoadEquipos">Recargar</button>
+                </div>
+                @if (!string.IsNullOrEmpty(EqMsg)) { <div class="col-12"><div class="alert @(EqOk?"alert-success":"alert-danger") py-2 small mb-0">@EqMsg</div></div> }
+            </div>
+
+            @if (IsLoadingEquipos) { <div class="text-center py-3"><div class="spinner-border"></div></div> }
             else
             {
-                <div class="table-responsive mt-3">
-                    <table class="table table-hover align-middle small">
-                        <thead>
-                            <tr><th>Tabla</th><th>Propósito</th><th>Estado</th><th></th></tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var t in Tables)
-                            {
-                                <tr>
-                                    <td class="font-monospace"><span class="rtx-pill">@t.TableName</span></td>
-                                    <td class="text-muted">@t.Purpose</td>
-                                    <td>
-                                        @if (t.Exists)
-                                        {
-                                            <span class="badge bg-success">Existe</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="badge bg-warning text-dark">Falta</span>
-                                        }
-                                    </td>
-                                    <td>
-                                        @if (!t.Exists)
-                                        {
-                                            <button class="btn btn-sm btn-outline-primary" @onclick="() => CreateOne(t.TableName)" disabled="@Creating.Contains(t.TableName)">
-                                                @(Creating.Contains(t.TableName) ? "Creando..." : "Crear")
-                                            </button>
-                                        }
-                                        else
-                                        {
-                                            <span class="text-muted small">OK</span>
-                                        }
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
+                <div class="row g-3 mt-1">
+                    @foreach (var tipo in new[] { "VTI", "VTech" })
+                    {
+                        <div class="col-lg-6">
+                            <h6 class="mt-2"><span class="rtx-pill @(tipo=="VTI"?"rtx-pill--sky":"rtx-pill--honey")">@tipo</span> <span class="text-muted small">— @GetCount(tipo, true) con nombre / @GetCount(tipo, false) sin nombre</span></h6>
+                            <div class="card">
+                                <div class="card-header py-2 small fw-bold">Con nombre</div>
+                                <div class="table-responsive"><table class="table table-sm small mb-0"><thead><tr><th>DeviceId</th><th>Nombre</th><th>Área</th><th></th></tr></thead><tbody>
+                                    @foreach (var e in GetEquiposByTipo(tipo, true))
+                                    {
+                                        <tr><td class="font-monospace" style="font-size:.75rem">@e.DeviceId</td><td>@e.Nombre</td><td><span class="badge bg-light text-dark border">@e.Area</span></td><td><button class="btn btn-sm btn-outline-primary py-0" @onclick="() => { EqDeviceId=e.DeviceId; EqNombre=e.Nombre; EqArea=e.Area; }">Editar</button></td></tr>
+                                    }
+                                    @if (!GetEquiposByTipo(tipo, true).Any()) { <tr><td colspan="4" class="text-center text-muted py-2">Sin equipos con nombre</td></tr> }
+                                </tbody></table></div>
+                            </div>
+                            <div class="card mt-2">
+                                <div class="card-header py-2 small fw-bold">Sin nombre (pendientes)</div>
+                                <div class="table-responsive"><table class="table table-sm small mb-0"><thead><tr><th>DeviceId</th><th>NombrePC sync</th><th></th></tr></thead><tbody>
+                                    @foreach (var c in GetCatalogByTipo(tipo, false))
+                                    {
+                                        <tr><td class="font-monospace" style="font-size:.75rem">@c.DeviceId</td><td class="text-muted">@c.NombrePC</td><td><button class="btn btn-sm btn-outline-primary py-0" @onclick="() => EqDeviceId=c.DeviceId">Asignar</button></td></tr>
+                                    }
+                                    @if (!GetCatalogByTipo(tipo, false).Any()) { <tr><td colspan="3" class="text-center text-muted py-2">Todos con nombre ✓</td></tr> }
+                                </tbody></table></div>
+                            </div>
+                        </div>
+                    }
                 </div>
             }
-            @if (!string.IsNullOrEmpty(TableMsg))
-            {
-                <div class="alert @(TableOk ? "alert-success" : "alert-danger") mt-3 py-2 small">@TableMsg</div>
-            }
-            <div class="alert alert-light border small mt-3">
-                <strong>Nota:</strong> En modo scaffold (InMemory) la creación se simula. Con SQL Server real se ejecuta <code>CREATE TABLE IF NOT EXISTS</code> con <code>dbo.SXA_RTX_*</code>.
+        </div>
+    </div>
+}
+else if (ActiveTab == 4)
+{
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Tablas VTI / VTech — selección para Analytics</h5>
+            <p class="text-muted small">Elige de <code>INFORMATION_SCHEMA.TABLES</code> qué tablas usa Analytics por Tipo. Solo esas se ofrecerán en reportes.</p>
+            <div class="d-flex gap-2 mb-3">
+                <button class="btn btn-primary btn-sm" @onclick="LoadTablas" disabled="@IsLoadingTablas">@if (IsLoadingTablas) { <span class="spinner-border spinner-border-sm"></span> } else { @("Cargar tablas") }</button>
+                <button class="btn btn-success btn-sm" @onclick="SaveTablas" disabled="@IsSavingTablas">Guardar selección</button>
             </div>
+            @if (!string.IsNullOrEmpty(TablasMsg)) { <div class="alert @(TablasOk?"alert-success":"alert-danger") py-2 small">@TablasMsg</div> }
+            @if (AllTables.Count == 0) { <div class="text-muted small">Pulsa “Cargar tablas” (usa la cadena SQL de la pestaña SQL Server).</div> }
+            else
+            {
+                <div class="table-responsive"><table class="table table-sm small"><thead><tr><th>Tabla</th><th class="text-center">VTI</th><th class="text-center">VTech</th></tr></thead><tbody>
+                    @foreach (var t in AllTables)
+                    {
+                        <tr>
+                            <td class="font-monospace">@t</td>
+                            <td class="text-center"><input type="checkbox" checked="@IsTableSelected(t, EquipoTipo.VTI)" @onchange="e => ToggleTabla(t, EquipoTipo.VTI, (bool)(e.Value ?? false))" /></td>
+                            <td class="text-center"><input type="checkbox" checked="@IsTableSelected(t, EquipoTipo.VTech)" @onchange="e => ToggleTabla(t, EquipoTipo.VTech, (bool)(e.Value ?? false))" /></td>
+                        </tr>
+                    }
+                </tbody></table></div>
+                <div class="text-muted small">Seleccionadas: VTI @SelectedCount(EquipoTipo.VTI) / VTech @SelectedCount(EquipoTipo.VTech)</div>
+            }
         </div>
     </div>
 }
@@ -199,90 +180,55 @@ else
     int ActiveTab = 0;
 
     // SQL
-    string SqlServer = "localhost";
-    string SqlDatabase = "SXA_RTX_Analytics";
-    string SqlAuth = "sql";
-    string SqlUser = "";
-    string SqlPassword = "";
-    bool SqlEncrypt = true;
-    bool SqlTrust = true;
-    bool IsTestingSql = false;
-    bool SqlTestOk = false;
-    string? SqlTestMsg;
-    List<DatabaseOptionMutable> Databases = new();
+    string SqlServer = "localhost"; string SqlDatabase = "SXA_RTX_Analytics"; string SqlAuth = "sql"; string SqlUser = ""; string SqlPassword = ""; bool SqlEncrypt = true; bool SqlTrust = true;
+    bool IsTestingSql = false; bool SqlTestOk = false; string? SqlTestMsg; List<DatabaseOptionMutable> Databases = new();
 
     // ODBC
-    string OdbcConnectionString = "DSN=MAPICS;";
-    bool IsTestingOdbc = false;
-    bool OdbcTestOk = false;
-    string? OdbcTestMsg;
+    string OdbcConnectionString = "DSN=MAPICS;"; bool IsTestingOdbc = false; bool OdbcTestOk = false; string? OdbcTestMsg;
 
-    // Tables
-    List<SystemTableStatus> Tables = new();
-    bool IsLoadingTables = false;
-    bool IsCreatingAll = false;
-    HashSet<string> Creating = new();
-    string? TableMsg;
-    bool TableOk = false;
+    // System tables
+    List<SystemTableStatus> Tables = new(); bool IsLoadingTables = false; bool IsCreatingAll = false; HashSet<string> Creating = new(); string? TableMsg; bool TableOk = false;
 
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadTables();
-    }
+    // Equipos
+    List<CatalogDeviceDto> Catalog = new(); List<EquipoDto> Equipos = new(); bool IsLoadingEquipos = false;
+    string EqDeviceId = ""; string EqNombre = ""; string EqArea = ""; bool IsSavingEquipo = false; string? EqMsg; bool EqOk = false;
+    List<string> Areas => Equipos.Select(e => e.Area).Distinct().ToList();
 
-    string BuildSqlConnectionString()
-    {
-        if (SqlAuth == "win")
-            return $"Server={SqlServer};Database={SqlDatabase};Trusted_Connection=True;Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};";
-        return $"Server={SqlServer};Database={SqlDatabase};User Id={SqlUser};Password=***;Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};";
-    }
-    string BuildSqlConnectionStringReal()
-    {
-        if (SqlAuth == "win")
-            return $"Server={SqlServer};Database={SqlDatabase};Trusted_Connection=True;Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};";
-        return $"Server={SqlServer};Database={SqlDatabase};User Id={SqlUser};Password={SqlPassword};Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};";
-    }
+    // Tablas VTI/VTech
+    List<string> AllTables = new(); HashSet<(string, EquipoTipo)> Selected = new(); bool IsLoadingTablas = false; bool IsSavingTablas = false; string? TablasMsg; bool TablasOk = false;
 
-    async Task TestSql()
-    {
-        IsTestingSql = true; SqlTestMsg = null;
+    protected override async Task OnInitializedAsync() { await LoadTables(); await LoadEquipos(); }
+
+    string BuildSqlConnectionString() => SqlAuth=="win" ? $"Server={SqlServer};Database={SqlDatabase};Trusted_Connection=True;Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};" : $"Server={SqlServer};Database={SqlDatabase};User Id={SqlUser};Password=***;Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};";
+    string BuildSqlConnectionStringReal() => SqlAuth=="win" ? $"Server={SqlServer};Database={SqlDatabase};Trusted_Connection=True;Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};" : $"Server={SqlServer};Database={SqlDatabase};User Id={SqlUser};Password={SqlPassword};Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};";
+
+    async Task TestSql(){ IsTestingSql=true; SqlTestMsg=null; var (ok,msg)=await SystemService.TestSqlConnectionAsync(BuildSqlConnectionStringReal()); SqlTestOk=ok; SqlTestMsg=msg; IsTestingSql=false; }
+    async Task LoadDatabases(){ var list=await SystemService.ListDatabasesAsync(BuildSqlConnectionStringReal()); Databases=list.Select(n=>new DatabaseOptionMutable{Name=n}).ToList(); }
+    async Task TestOdbc(){ IsTestingOdbc=true; OdbcTestMsg=null; var (ok,msg)=await SystemService.TestOdbcConnectionAsync(OdbcConnectionString); OdbcTestOk=ok; OdbcTestMsg=msg; IsTestingOdbc=false; }
+    async Task LoadTables(){ IsLoadingTables=true; Tables=(await SystemService.GetSystemTablesStatusAsync()).ToList(); IsLoadingTables=false; }
+    async Task CreateOne(string t){ Creating.Add(t); var (ok,msg)=await SystemService.CreateTableAsync(t); TableOk=ok; TableMsg=msg; Creating.Remove(t); await LoadTables(); }
+    async Task CreateAll(){ IsCreatingAll=true; var (ok,msg)=await SystemService.CreateAllMissingAsync(); TableOk=ok; TableMsg=msg; IsCreatingAll=false; await LoadTables(); }
+
+    async Task LoadEquipos(){
+        IsLoadingEquipos=true;
         var cs = BuildSqlConnectionStringReal();
-        var (ok, msg) = await SystemService.TestSqlConnectionAsync(cs);
-        SqlTestOk = ok; SqlTestMsg = msg; IsTestingSql = false;
+        Catalog = (await EquipoService.GetCatalogAsync(cs)).ToList();
+        Equipos = (await EquipoService.GetEquiposAsync()).ToList();
+        // Merge Tipo from catalog
+        var map = Catalog.ToDictionary(c=>c.DeviceId, c=>c);
+        for(int i=0;i<Equipos.Count;i++){ var e=Equipos[i]; if(map.TryGetValue(e.DeviceId, out var c)){ var tipo = c.TipoMaquina?.Equals("VTech", StringComparison.OrdinalIgnoreCase)==true ? EquipoTipo.VTech : c.TipoMaquina?.Equals("VTI", StringComparison.OrdinalIgnoreCase)==true ? EquipoTipo.VTI : (EquipoTipo?)null; Equipos[i]= e with{ TipoSync=tipo, NombrePCSync=c.NombrePC, UltimoContacto=c.UltimoContacto }; } }
+        IsLoadingEquipos=false;
     }
-    async Task LoadDatabases()
-    {
-        var cs = BuildSqlConnectionStringReal();
-        var list = await SystemService.ListDatabasesAsync(cs);
-        Databases = list.Select(n => new DatabaseOptionMutable { Name = n, IsSelected = false }).ToList();
-        if (Databases.Count == 0) SqlTestMsg = (SqlTestMsg ?? "") + " (sin bases o sin permisos sys.databases)";
-    }
-    async Task TestOdbc()
-    {
-        IsTestingOdbc = true; OdbcTestMsg = null;
-        var (ok, msg) = await SystemService.TestOdbcConnectionAsync(OdbcConnectionString);
-        OdbcTestOk = ok; OdbcTestMsg = msg; IsTestingOdbc = false;
-    }
-    async Task LoadTables()
-    {
-        IsLoadingTables = true;
-        Tables = (await SystemService.GetSystemTablesStatusAsync()).ToList();
-        IsLoadingTables = false;
-    }
-    async Task CreateOne(string table)
-    {
-        Creating.Add(table);
-        var (ok, msg) = await SystemService.CreateTableAsync(table);
-        TableOk = ok; TableMsg = msg; Creating.Remove(table);
-        await LoadTables();
-    }
-    async Task CreateAll()
-    {
-        IsCreatingAll = true;
-        var (ok, msg) = await SystemService.CreateAllMissingAsync();
-        TableOk = ok; TableMsg = msg; IsCreatingAll = false;
-        await LoadTables();
-    }
+    async Task SaveEquipo(){ IsSavingEquipo=true; EqMsg=null; var (ok,msg)=await EquipoService.UpsertAsync(EqDeviceId, EqNombre, EqArea); EqOk=ok; EqMsg=msg; IsSavingEquipo=false; if(ok) await LoadEquipos(); }
+    int GetCount(string tipo, bool conNombre){ var set = Equipos.Where(e=> (e.TipoSync?.ToString()??"")==tipo).Select(e=>e.DeviceId).ToHashSet(); var cat = Catalog.Where(c=> (c.TipoMaquina??"")==tipo).Select(c=>c.DeviceId).ToHashSet(); return conNombre ? set.Count : cat.Except(set).Count(); }
+    IEnumerable<EquipoDto> GetEquiposByTipo(string tipo, bool conNombre){ var filtered = Equipos.Where(e=> (e.TipoSync?.ToString()??"")==tipo); return conNombre ? filtered : Enumerable.Empty<EquipoDto>(); }
+    IEnumerable<CatalogDeviceDto> GetCatalogByTipo(string tipo, bool _con){ var eqSet = Equipos.Select(e=>e.DeviceId).ToHashSet(); return Catalog.Where(c=> (c.TipoMaquina??"")==tipo && !eqSet.Contains(c.DeviceId)); }
 
-    class DatabaseOptionMutable { public string Name { get; set; } = ""; public bool IsSelected { get; set; } }
+    async Task LoadTablas(){ IsLoadingTablas=true; AllTables=(await TablasService.ListAllTablesAsync(BuildSqlConnectionStringReal())).ToList(); var cfg=await TablasService.GetConfigAsync(); Selected=new HashSet<(string, EquipoTipo)>(cfg.Select(x=>(x.TableName, x.Tipo))); IsLoadingTablas=false; }
+    bool IsTableSelected(string t, EquipoTipo tipo)=> Selected.Contains((t,tipo));
+    void ToggleTabla(string t, EquipoTipo tipo, bool isChecked){ if(isChecked) Selected.Add((t,tipo)); else Selected.Remove((t,tipo)); }
+    int SelectedCount(EquipoTipo tipo)=> Selected.Count(x=>x.Item2==tipo);
+    async Task SaveTablas(){ IsSavingTablas=true; var (ok,msg)=await TablasService.SaveAsync(Selected.Select(x=>(x.Item1,x.Item2)).ToList()); TablasOk=ok; TablasMsg=msg; IsSavingTablas=false; }
+
+    class DatabaseOptionMutable { public string Name { get; set; }=""; public bool IsSelected { get; set; } }
 }

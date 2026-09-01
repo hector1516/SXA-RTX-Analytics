@@ -33,6 +33,8 @@ public static class ServiceCollectionExtensions
         }
 
         services.AddScoped<ISystemTableService, SqlSystemTableService>();
+        services.AddScoped<IEquipoService, EquipoService>();
+        services.AddScoped<ITablasConfigService, TablasConfigService>();
         return services;
     }
 }
