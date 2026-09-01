@@ -170,8 +170,12 @@ a:hover { color: var(--rtx-navy); }
 }
 @keyframes rtx-pulse { 0% { transform: scale(.7); opacity: 1 } 100% { transform: scale(1.4); opacity: 0 } }
 
-/* Footer micro */
-.rtx-footer { color: var(--rtx-muted); font-size: .82rem; }
+/* Footer + client logos */
+.rtx-footer { color: var(--rtx-muted); font-size: .82rem; background: #fff; }
+.rtx-footer-logo { filter: grayscale(0); opacity: .92; transition: opacity .15s; }
+.rtx-footer-logo:hover { opacity: 1; }
+.rtx-client-logo { opacity: .9; filter: grayscale(0); }
+.rtx-client-bar { background: #fff; border: 1px solid var(--rtx-border); border-radius: 999px; padding: .25rem .6rem; }
 
 /* Validation */
 .valid.modified:not([type=checkbox]) { outline: 1px solid #26b050; }

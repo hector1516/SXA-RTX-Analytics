@@ -7,10 +7,18 @@
 
     <main>
         <div class="top-row px-4 rtx-topbar">
-            <div class="d-flex align-items-center gap-2">
-                <span class="rtx-pill rtx-pill--mint rtx-pulse"><span class="rtx-kicker-dot"></span> LIVE</span>
-                <a href="/health" target="_blank" class="btn btn-sm btn-outline-primary">/health</a>
-                <span class="text-muted small d-none d-md-inline">SXA-RTX Analytics • ECCSA Automation</span>
+            <div class="d-flex align-items-center gap-3 w-100 justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="rtx-pill rtx-pill--mint rtx-pulse"><span class="rtx-kicker-dot"></span> LIVE</span>
+                    <a href="/health" target="_blank" class="btn btn-sm btn-outline-primary">/health</a>
+                </div>
+                <div class="d-none d-lg-flex align-items-center gap-2 rtx-client-bar">
+                    <span class="small text-muted">Cliente</span>
+                    <img src="img/hussmann.png" alt="Hussmann" height="18" class="rtx-client-logo" />
+                    <span class="text-muted">•</span>
+                    <span class="small text-muted">Desarrollado por</span>
+                    <img src="img/eccsa.png" alt="ECCSA Automation" height="22" class="rtx-client-logo" />
+                </div>
             </div>
         </div>
 
@@ -19,14 +27,22 @@
         </article>
 
         <footer class="px-4 py-3 rtx-footer border-top mt-4">
-            <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
-                <span>Hecho con ♥ para ECCSA Automation — chibi mecha edition</span>
-                <span class="d-flex gap-2">
+            <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <img src="img/eccsa.png" alt="ECCSA Automation" height="28" class="rtx-footer-logo" />
+                    <span class="text-muted small">Soluciones en Automatización y Control</span>
+                    <span class="vr d-none d-sm-block" style="height:24px"></span>
+                    <img src="img/hussmann.png" alt="Hussmann" height="20" class="rtx-footer-logo" />
+                    <span class="small text-muted">Cliente</span>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
                     <span class="rtx-pill rtx-pill--sky">Blazor</span>
                     <span class="rtx-pill rtx-pill--honey">EFCore</span>
                     <span class="rtx-pill">SQL Server</span>
-                </span>
+                    <span class="small text-muted d-none d-xl-inline">— chibi mecha × VTIVTECH</span>
+                </div>
             </div>
+            <div class="small text-muted mt-2" style="opacity:.7">© ECCSA Automation — Plataforma interna SXA-RTX Analytics. Uso confidencial.</div>
         </footer>
     </main>
 </div>
