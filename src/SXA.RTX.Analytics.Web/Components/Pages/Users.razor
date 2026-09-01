@@ -1,0 +1,71 @@
+@page "/users"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Administrador")]
+@using Microsoft.AspNetCore.Authorization
+@using SXA.RTX.Analytics.Application.Abstractions
+@using SXA.RTX.Analytics.Domain.Entities
+@inject IAuthService Auth
+
+<PageTitle>Usuarios — SXA-RTX Analytics</PageTitle>
+
+<h3 class="fw-bold" style="letter-spacing:-.02em">Usuarios</h3>
+<p class="text-muted small">Administra accesos. <span class="rtx-pill">Administrador</span> edita todo. <span class="rtx-pill rtx-pill--honey">Usuario</span> no ve Configuración.</p>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h6 class="card-title">@(EditingId==null ? "Nuevo usuario" : "Editar usuario")</h6>
+        <div class="row g-3">
+            <div class="col-md-3"><label class="form-label small">Usuario</label><input class="form-control" @bind="FormUsername" disabled="@(EditingId!=null)" placeholder="ej. juan.perez" /></div>
+            <div class="col-md-3"><label class="form-label small">Nombre mostrado</label><input class="form-control" @bind="FormDisplay" placeholder="Juan Pérez" /></div>
+            <div class="col-md-2"><label class="form-label small">Rol</label><select class="form-select" @bind="FormRole"><option value="@AppRole.Administrador">Administrador</option><option value="@AppRole.Usuario">Usuario</option></select></div>
+            <div class="col-md-2"><label class="form-label small">Activo</label><select class="form-select" @bind="FormActive"><option value="true">Sí</option><option value="false">No</option></select></div>
+            <div class="col-md-2"><label class="form-label small">Contraseña @(EditingId==null ? "" : "(vacío = no cambia)")</label><input type="password" class="form-control" @bind="FormPassword" placeholder="••••••••" /></div>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-primary" @onclick="Save" disabled="@IsSaving">@if (IsSaving) { <span class="spinner-border spinner-border-sm"></span> } else { @(EditingId==null ? "Crear" : "Guardar") }</button>
+            @if (EditingId!=null) { <button class="btn btn-outline-secondary" @onclick="Cancel">Cancelar</button> }
+        </div>
+        @if (!string.IsNullOrEmpty(Msg)) { <div class="alert @(Ok?"alert-success":"alert-danger") mt-3 py-2 small">@Msg</div> }
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <h6 class="card-title">Listado</h6>
+        @if (IsLoading) { <div class="text-center py-3"><div class="spinner-border"></div></div> }
+        else
+        {
+            <div class="table-responsive"><table class="table table-sm align-middle small"><thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Activo</th><th>Creado</th><th></th></tr></thead><tbody>
+                @foreach (var u in UserList)
+                {
+                    <tr>
+                        <td class="font-monospace">@u.Username</td><td>@u.DisplayName</td><td><span class="badge @(u.Role==AppRole.Administrador?"bg-primary":"bg-secondary")">@u.Role</span></td><td>@(u.IsActive?"Sí":"No")</td><td>@u.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd")</td>
+                        <td class="d-flex gap-1">
+                            <button class="btn btn-sm btn-outline-primary py-0" @onclick="() => Edit(u)">Editar</button>
+                            <button class="btn btn-sm btn-outline-danger py-0" @onclick="() => Delete(u.Id)">Borrar</button>
+                        </td>
+                    </tr>
+                }
+            </tbody></table></div>
+        }
+    </div>
+</div>
+
+@code {
+    List<AppUser> UserList = new(); bool IsLoading = false; bool IsSaving = false; string? Msg; bool Ok;
+    Guid? EditingId; string FormUsername=""; string FormDisplay=""; AppRole FormRole=AppRole.Usuario; bool FormActive=true; string FormPassword="";
+
+    protected override async Task OnInitializedAsync() => await Load();
+    async Task Load(){ IsLoading=true; UserList=(await Auth.ListUsersAsync()).ToList(); IsLoading=false; }
+    void Edit(AppUser u){ EditingId=u.Id; FormUsername=u.Username; FormDisplay=u.DisplayName; FormRole=u.Role; FormActive=u.IsActive; FormPassword=""; }
+    void Cancel(){ EditingId=null; FormUsername=""; FormDisplay=""; FormRole=AppRole.Usuario; FormActive=true; FormPassword=""; Msg=null; }
+    async Task Save(){
+        IsSaving=true; Msg=null;
+        AuthResult r;
+        if (EditingId==null) r=await Auth.CreateUserAsync(FormUsername, FormPassword, FormDisplay, FormRole);
+        else r=await Auth.UpdateUserAsync(EditingId.Value, FormDisplay, FormRole, FormActive, string.IsNullOrWhiteSpace(FormPassword)?null:FormPassword);
+        Ok=r.Success; Msg=r.Message; IsSaving=false;
+        if (r.Success) { Cancel(); await Load(); }
+    }
+    async Task Delete(Guid id){ var r=await Auth.DeleteUserAsync(id); Ok=r.Success; Msg=r.Message; if(r.Success) await Load(); }
+}

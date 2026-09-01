@@ -1,4 +1,5 @@
 ﻿@inherits LayoutComponentBase
+@inject AuthenticationStateProvider AuthState
 
 <div class="page">
     <div class="sidebar">
@@ -11,6 +12,21 @@
                 <span class="rtx-pill rtx-pill--mint rtx-pulse"><span class="rtx-kicker-dot"></span> LIVE</span>
                 <a href="/health" target="_blank" class="btn btn-sm btn-outline-primary">/health</a>
             </div>
+            <AuthorizeView>
+                <Authorized>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="rtx-pill" style="background:#fff; border-color:#D9E2EC">
+                            <span style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#3A7BD5,#5AA9E6);color:#fff;display:grid;place-items:center;font-weight:800;font-size:.8rem">@Initial(context.User.Identity?.Name)</span>
+                            @context.User.Identity?.Name
+                            <span class="badge @(IsAdmin(context) ? "bg-primary" : "bg-secondary")" style="font-size:.65rem">@Role(context)</span>
+                        </span>
+                        <a href="/logout" class="btn btn-sm btn-outline-secondary">Salir</a>
+                    </div>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="/login" class="btn btn-sm btn-primary">Entrar</a>
+                </NotAuthorized>
+            </AuthorizeView>
         </div>
 
         <article class="content px-4">
@@ -42,3 +58,9 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    string Initial(string? name) => string.IsNullOrEmpty(name) ? "?" : name.Substring(0,1).ToUpperInvariant();
+    bool IsAdmin(AuthenticationState s) => s.User.IsInRole("Administrador");
+    string Role(AuthenticationState s) => s.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
+}

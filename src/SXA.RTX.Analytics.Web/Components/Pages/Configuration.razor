@@ -1,11 +1,15 @@
 @page "/configuration"
 @rendermode InteractiveServer
+@attribute [Authorize(Roles = "Administrador")]
+@using Microsoft.AspNetCore.Authorization
 @using SXA.RTX.Analytics.Application.Abstractions
 @using SXA.RTX.Analytics.Domain.Enums
 @inject ISystemTableService SystemService
 @inject IEquipoService EquipoService
 @inject ITablasConfigService TablasService
+@inject IConfigExportService ExportService
 @inject IConfiguration Config
+@inject IJSRuntime JS
 
 <PageTitle>Configuración — SXA-RTX Analytics</PageTitle>
 
@@ -26,6 +30,7 @@
     <li class="nav-item"><button class="nav-link @(ActiveTab==2?"active":"")" @onclick="() => ActiveTab=2">Tablas sistema</button></li>
     <li class="nav-item"><button class="nav-link @(ActiveTab==3?"active":"")" @onclick="() => { ActiveTab=3; _ = LoadEquipos(); }">Equipos</button></li>
     <li class="nav-item"><button class="nav-link @(ActiveTab==4?"active":"")" @onclick="() => { ActiveTab=4; _ = LoadTablas(); }">Tablas VTI/VTech</button></li>
+    <li class="nav-item"><button class="nav-link @(ActiveTab==5?"active":"")" @onclick="() => ActiveTab=5">Import/Export</button></li>
 </ul>
 
 @if (ActiveTab == 0)
@@ -175,6 +180,23 @@ else if (ActiveTab == 4)
         </div>
     </div>
 }
+else if (ActiveTab == 5)
+{
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Import / Export — respaldo de configuración</h5>
+            <p class="text-muted small">Descarga toda la configuración (<code>Equipos, Tablas VTI/VTech, Tablas sistema, ApplicationSettings, Usuarios</code>) en un JSON. Cada nueva sección que agreguemos se incluirá automáticamente aquí.</p>
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-primary" @onclick="Exportar" disabled="@IsExporting">@if (IsExporting) { <span class="spinner-border spinner-border-sm"></span> @(" Exportando...") } else { @("Descargar JSON") }</button>
+                <label class="btn btn-outline-primary mb-0">
+                    Cargar JSON <InputFile OnChange="Importar" accept=".json" style="display:none" />
+                </label>
+            </div>
+            @if (!string.IsNullOrEmpty(ImportExportMsg)) { <div class="alert @(ImportExportOk?"alert-success":"alert-danger") mt-3 py-2 small">@ImportExportMsg</div> }
+            @if (!string.IsNullOrEmpty(ExportPreview)) { <pre class="mt-3 p-3 bg-light border rounded small" style="max-height:300px;overflow:auto">@ExportPreview</pre> }
+        </div>
+    </div>
+}
 
 @code {
     int ActiveTab = 0;
@@ -196,6 +218,9 @@ else if (ActiveTab == 4)
 
     // Tablas VTI/VTech
     List<string> AllTables = new(); HashSet<(string, EquipoTipo)> Selected = new(); bool IsLoadingTablas = false; bool IsSavingTablas = false; string? TablasMsg; bool TablasOk = false;
+
+    // Import/Export
+    bool IsExporting = false; bool IsImporting = false; string? ImportExportMsg; bool ImportExportOk = false; string? ExportPreview;
 
     protected override async Task OnInitializedAsync() { await LoadTables(); await LoadEquipos(); }
 
@@ -229,6 +254,28 @@ else if (ActiveTab == 4)
     void ToggleTabla(string t, EquipoTipo tipo, bool isChecked){ if(isChecked) Selected.Add((t,tipo)); else Selected.Remove((t,tipo)); }
     int SelectedCount(EquipoTipo tipo)=> Selected.Count(x=>x.Item2==tipo);
     async Task SaveTablas(){ IsSavingTablas=true; var (ok,msg)=await TablasService.SaveAsync(Selected.Select(x=>(x.Item1,x.Item2)).ToList()); TablasOk=ok; TablasMsg=msg; IsSavingTablas=false; }
+
+    async Task Exportar(){
+        IsExporting=true; ImportExportMsg=null;
+        var json = await ExportService.ExportJsonAsync();
+        ExportPreview = json.Length > 4000 ? json.Substring(0,4000)+"..." : json;
+        var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+        var b64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("eval", $"var a=document.createElement('a');a.href='data:application/json;base64,{b64}';a.download='sxa-rtx-config-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();");
+        ImportExportOk=true; ImportExportMsg="Descargado. Incluye Equipos, Tablas VTI/VTech, Tablas sistema, Settings y Usuarios."; IsExporting=false;
+    }
+    async Task Importar(InputFileChangeEventArgs e){
+        IsImporting=true; ImportExportMsg=null;
+        try {
+            using var stream = e.File.OpenReadStream(maxAllowedSize: 5*1024*1024);
+            using var reader = new System.IO.StreamReader(stream);
+            var json = await reader.ReadToEndAsync();
+            var (ok,msg)=await ExportService.ImportJsonAsync(json);
+            ImportExportOk=ok; ImportExportMsg=msg;
+            if(ok){ await LoadEquipos(); await LoadTablas(); await LoadTables(); }
+        } catch(Exception ex){ ImportExportOk=false; ImportExportMsg=ex.Message; }
+        IsImporting=false;
+    }
 
     class DatabaseOptionMutable { public string Name { get; set; }=""; public bool IsSelected { get; set; } }
 }

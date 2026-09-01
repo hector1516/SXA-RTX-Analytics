@@ -1,0 +1,95 @@
+@page "/login"
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
+@using SXA.RTX.Analytics.Application.Abstractions
+@inject IAuthService Auth
+@inject IHttpContextAccessor Http
+@inject NavigationManager Nav
+
+<PageTitle>Login — SXA-RTX Analytics</PageTitle>
+
+<div class="login-wrap">
+    <div class="login-card">
+        <div class="login-hero">
+            <img src="img/logo.png" alt="logo" />
+            <div class="login-glow"></div>
+        </div>
+        <div class="login-body">
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <img src="img/eccsa.png" alt="ECCSA" height="20" />
+                <span class="text-muted small">×</span>
+                <img src="img/hussmann.png" alt="Hussmann" height="16" />
+            </div>
+            <h3 class="fw-bold mb-1" style="letter-spacing:-.02em">SXA-RTX Analytics</h3>
+            <p class="text-muted small mb-4">Acceso seguro — ECCSA Automation</p>
+
+            <div class="mb-3">
+                <label class="form-label small fw-bold">Usuario</label>
+                <input class="form-control form-control-lg" @bind="Username" placeholder="ECCSA" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-bold">Contraseña</label>
+                <input type="password" class="form-control form-control-lg" @bind="Password" placeholder="••••••••" @onkeydown="OnKey" />
+            </div>
+
+            @if (!string.IsNullOrEmpty(Error)) { <div class="alert alert-danger py-2 small">@Error</div> }
+            @if (!string.IsNullOrEmpty(OkMsg)) { <div class="alert alert-success py-2 small">@OkMsg</div> }
+
+            <button class="btn btn-primary w-100 btn-lg" @onclick="DoLogin" disabled="@IsBusy">
+                @if (IsBusy) { <span class="spinner-border spinner-border-sm"></span> } else { @("Entrar →") }
+            </button>
+
+            <div class="text-center small text-muted mt-3">Usuario demo: <code>ECCSA</code> / <code>Qwe123456</code> (Administrador)</div>
+        </div>
+    </div>
+    <div class="login-bg"></div>
+</div>
+
+<style>
+.login-wrap { min-height: 100vh; display: grid; place-items: center; position: relative; overflow: hidden; background: radial-gradient(800px 400px at 20% 0%, rgba(58,123,213,.18), transparent 60%), radial-gradient(700px 500px at 90% 100%, rgba(255,200,75,.18), transparent 60%), linear-gradient(135deg, #0F1F3A 0%, #1B2A4E 50%, #2A4A7A 100%); margin: -1.5rem; padding: 2rem; }
+.login-bg { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px), linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px); background-size: 32px 32px; opacity: .25; }
+.login-card { position: relative; z-index: 1; display: grid; grid-template-columns: 1.1fr 1.2fr; max-width: 860px; width: 100%; background: #fff; border-radius: 24px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,.35); }
+.login-hero { background: linear-gradient(135deg, #EAF4FF 0%, #FFF6D6 100%); display: grid; place-items: center; padding: 2rem; position: relative; overflow: hidden; }
+.login-hero img { width: 92%; max-width: 360px; filter: drop-shadow(0 18px 30px rgba(0,0,0,.18)); animation: rtx-float 4.2s ease-in-out infinite; }
+.login-glow { position: absolute; width: 420px; height: 420px; background: radial-gradient(circle, rgba(58,123,213,.18), transparent 70%); top: -80px; right: -80px; }
+.login-body { padding: 2rem 2rem 1.5rem; }
+@@media (max-width: 768px) { .login-card { grid-template-columns: 1fr; } .login-hero { padding: 1.2rem; } .login-hero img { max-width: 220px; } }
+</style>
+
+@code {
+    string Username = "ECCSA";
+    string Password = "";
+    string? Error;
+    string? OkMsg;
+    bool IsBusy = false;
+
+    async Task OnKey(KeyboardEventArgs e) { if (e.Key == "Enter") await DoLogin(); }
+
+    async Task DoLogin()
+    {
+        Error = null; OkMsg = null; IsBusy = true;
+        var res = await Auth.LoginAsync(Username.Trim(), Password);
+        if (!res.Success || res.User is null) { Error = res.Message; IsBusy = false; return; }
+
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.Name, res.User.Username),
+            new(ClaimTypes.NameIdentifier, res.User.Id.ToString()),
+            new(ClaimTypes.Role, res.User.Role.ToString()),
+            new("DisplayName", res.User.DisplayName),
+        };
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        var principal = new ClaimsPrincipal(identity);
+        var ctx = Http.HttpContext;
+        if (ctx is not null)
+        {
+            await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties { IsPersistent = true, ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8) });
+            OkMsg = "Acceso concedido — redirigiendo...";
+            IsBusy = false;
+            Nav.NavigateTo("/", forceLoad: true);
+        }
+        else { Error = "No se pudo crear la sesión (HttpContext nulo). Recarga."; IsBusy = false; }
+    }
+}

@@ -35,6 +35,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISystemTableService, SqlSystemTableService>();
         services.AddScoped<IEquipoService, EquipoService>();
         services.AddScoped<ITablasConfigService, TablasConfigService>();
+        services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IConfigExportService, ConfigExportService>();
         return services;
     }
 }

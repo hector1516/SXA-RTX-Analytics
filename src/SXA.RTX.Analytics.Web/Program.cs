@@ -1,7 +1,10 @@
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Serilog;
+using SXA.RTX.Analytics.Domain.Entities;
 using SXA.RTX.Analytics.Infrastructure.Extensions;
 using SXA.RTX.Analytics.Infrastructure.Persistence;
 using SXA.RTX.Analytics.Reporting.Extensions;
@@ -9,9 +12,6 @@ using SXA.RTX.Analytics.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ------------------------------------------------------------------
-// Serilog — structured logging (console + file, no secrets)
-// ------------------------------------------------------------------
 builder.Host.UseSerilog((ctx, services, cfg) =>
 {
     cfg.ReadFrom.Configuration(ctx.Configuration)
@@ -19,40 +19,41 @@ builder.Host.UseSerilog((ctx, services, cfg) =>
        .Enrich.FromLogContext()
        .Enrich.WithProperty("Application", "SXA.RTX.Analytics")
        .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
-       .WriteTo.File(
-            path: "logs/sxa-rtx-analytics-.log",
-            rollingInterval: RollingInterval.Day,
-            retainedFileCountLimit: 14,
+       .WriteTo.File(path: "logs/sxa-rtx-analytics-.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 14,
             outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}");
 });
 
-// ------------------------------------------------------------------
-// Configuration
-// ------------------------------------------------------------------
-// ConnectionStrings:ConfigurationDatabase is read from appsettings.json / env / user-secrets.
-// Never commit real secrets. See docs/SECURITY.md.
-
-// ------------------------------------------------------------------
-// Services
-// ------------------------------------------------------------------
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddCascadingAuthenticationState();
+
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(opt =>
+    {
+        opt.LoginPath = "/login";
+        opt.LogoutPath = "/logout";
+        opt.AccessDeniedPath = "/login";
+        opt.ExpireTimeSpan = TimeSpan.FromHours(8);
+        opt.SlidingExpiration = true;
+        opt.Cookie.Name = "SXA_RTX_Auth";
+        opt.Cookie.HttpOnly = true;
+    });
+builder.Services.AddAuthorization(opts =>
+{
+    opts.AddPolicy("AdminOnly", p => p.RequireRole("Administrador"));
+});
 
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddReportingEngine();
 
 builder.Services.AddHealthChecks()
-    .AddDbContextCheck<ConfigurationDbContext>(
-        name: "configuration_database",
-        failureStatus: HealthStatus.Degraded,
-        tags: ["db", "configuration"])
+    .AddDbContextCheck<ConfigurationDbContext>(name: "configuration_database", failureStatus: HealthStatus.Degraded, tags: ["db", "configuration"])
     .AddCheck("self", () => HealthCheckResult.Healthy("Application is running"), tags: ["live"]);
 
 var app = builder.Build();
 
-// ------------------------------------------------------------------
-// Request pipeline
-// ------------------------------------------------------------------
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
@@ -62,78 +63,53 @@ if (!app.Environment.IsDevelopment())
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 app.UseAntiforgery();
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapStaticAssets();
 
-// ------------------------------------------------------------------
-// Health endpoints
-// ------------------------------------------------------------------
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
     Predicate = _ => true,
     ResponseWriter = async (ctx, report) =>
     {
         ctx.Response.ContentType = "application/json; charset=utf-8";
-        var json = System.Text.Json.JsonSerializer.Serialize(new
-        {
-            status = report.Status.ToString(),
-            duration = report.TotalDuration.ToString(),
-            checks = report.Entries.Select(e => new
-            {
-                name = e.Key,
-                status = e.Value.Status.ToString(),
-                duration = e.Value.Duration.ToString(),
-                description = e.Value.Description,
-                data = e.Value.Data
-            })
-        }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        var json = System.Text.Json.JsonSerializer.Serialize(new { status = report.Status.ToString(), duration = report.TotalDuration.ToString(), checks = report.Entries.Select(e => new { name = e.Key, status = e.Value.Status.ToString(), duration = e.Value.Duration.ToString(), description = e.Value.Description, data = e.Value.Data }) }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
         await ctx.Response.WriteAsync(json);
     }
 });
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = r => r.Tags.Contains("live"), ResponseWriter = async (ctx, report) => { ctx.Response.ContentType = "text/plain"; await ctx.Response.WriteAsync(report.Status == HealthStatus.Healthy ? "Healthy" : "Unhealthy"); } });
 
-app.MapHealthChecks("/health/live", new HealthCheckOptions
+app.MapGet("/logout", async (HttpContext ctx) =>
 {
-    Predicate = r => r.Tags.Contains("live"),
-    ResponseWriter = async (ctx, report) =>
-    {
-        ctx.Response.ContentType = "text/plain";
-        await ctx.Response.WriteAsync(report.Status == HealthStatus.Healthy ? "Healthy" : "Unhealthy");
-    }
+    await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+    ctx.Response.Redirect("/login");
+    return Results.Empty;
 });
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-// ------------------------------------------------------------------
-// Startup logging + ensure DB created (Phase 1 scaffold)
-// ------------------------------------------------------------------
 try
 {
     Log.Information("Starting SXA-RTX Analytics Web (Environment={Environment})", app.Environment.EnvironmentName);
-
-    // Auto-create / migrate the configuration database if a real connection string is present.
-    // For InMemory fallback this is a no-op (DB is created on first use).
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<ConfigurationDbContext>();
-        if (db.Database.IsRelational())
+        if (db.Database.IsRelational()) await db.Database.EnsureCreatedAsync();
+        else await db.Database.EnsureCreatedAsync();
+
+        // Seed Administrador ECCSA / Qwe123456 si no existe
+        if (!await db.Set<AppUser>().AnyAsync(x => x.Username == "ECCSA"))
         {
-            // EnsureCreated is safe for scaffold; will be replaced by migrations once SQL Server is available.
-            // Comment out if you prefer explicit `dotnet ef migrations` workflow.
-            await db.Database.EnsureCreatedAsync();
-            Log.Information("Configuration database ensured (Provider={Provider})", db.Database.ProviderName);
+            var hash = BCrypt.Net.BCrypt.HashPassword("Qwe123456");
+            db.Set<AppUser>().Add(new AppUser { Username = "ECCSA", PasswordHash = hash, DisplayName = "ECCSA", Role = AppRole.Administrador });
+            await db.SaveChangesAsync();
+            Log.Information("Seed usuario ECCSA creado");
         }
-        else
-        {
-            await db.Database.EnsureCreatedAsync();
-            Log.Information("Using in-memory configuration store (no ConnectionStrings:ConfigurationDatabase)");
-        }
+        Log.Information("DB ready Provider={Provider} Users={Count}", db.Database.ProviderName, await db.Set<AppUser>().CountAsync());
     }
 }
-catch (Exception ex)
-{
-    Log.Fatal(ex, "Application startup failed");
-    throw;
-}
+catch (Exception ex) { Log.Fatal(ex, "Startup failed"); throw; }
 
 app.Lifetime.ApplicationStarted.Register(() => Log.Information("SXA-RTX Analytics started successfully"));
 app.Lifetime.ApplicationStopping.Register(() => Log.Information("SXA-RTX Analytics stopping"));
