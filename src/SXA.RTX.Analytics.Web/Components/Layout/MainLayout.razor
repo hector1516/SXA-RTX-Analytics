@@ -6,12 +6,33 @@
     </div>
 
     <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+        <div class="top-row px-4 rtx-topbar">
+            <div class="d-flex align-items-center gap-2">
+                <span class="rtx-pill rtx-pill--mint rtx-pulse"><span class="rtx-kicker-dot"></span> LIVE</span>
+                <a href="/health" target="_blank" class="btn btn-sm btn-outline-primary">/health</a>
+                <span class="text-muted small d-none d-md-inline">SXA-RTX Analytics • ECCSA Automation</span>
+            </div>
         </div>
 
         <article class="content px-4">
             @Body
         </article>
+
+        <footer class="px-4 py-3 rtx-footer border-top mt-4">
+            <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
+                <span>Hecho con ♥ para ECCSA Automation — chibi mecha edition</span>
+                <span class="d-flex gap-2">
+                    <span class="rtx-pill rtx-pill--sky">Blazor</span>
+                    <span class="rtx-pill rtx-pill--honey">EFCore</span>
+                    <span class="rtx-pill">SQL Server</span>
+                </span>
+            </div>
+        </footer>
     </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
 </div>

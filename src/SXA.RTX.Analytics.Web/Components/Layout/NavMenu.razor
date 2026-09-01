@@ -1,23 +1,78 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">SXA-RTX Analytics</a>
+﻿<div class="rtx-brand ps-3 py-3">
+    <a href="" class="text-decoration-none d-flex align-items-center gap-3">
+        <img src="img/logo.png" alt="VTIVTECH chibi" width="52" height="52" class="rtx-logo" />
+        <div class="lh-sm">
+            <div class="rtx-brand-title">SXA-RTX</div>
+            <div class="rtx-brand-sub">Analytics</div>
+            <div class="rtx-brand-tag">ECCSA Automation</div>
+        </div>
+    </a>
+    <div class="rtx-brand-badge mt-3">
+        <span class="rtx-gauge"></span>
+        <span>PROPANO • OTRO • CHÍMICO</span>
+        <span class="rtx-gauge" style="transform: scaleX(-1)"></span>
     </div>
 </div>
 
 <input type="checkbox" title="Navigation menu" class="navbar-toggler" />
 
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+    <nav class="nav flex-column gap-1 px-2">
+        <div class="nav-item">
+            <NavLink class="nav-link rtx-navlink" href="" Match="NavLinkMatch.All">
+                <span class="rtx-nav-icon">◉</span> Inicio
+            </NavLink>
+        </div>
+        <div class="nav-item">
+            <NavLink class="nav-link rtx-navlink" href="health" target="_blank">
+                <span class="rtx-nav-icon">◎</span> Health <small class="opacity-75">/health</small>
             </NavLink>
         </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="health" target="_blank">
-                <span class="bi bi-activity" aria-hidden="true"></span> Health
-            </NavLink>
+        <div class="rtx-nav-section mt-3">Próximamente</div>
+        <div class="nav-item opacity-60">
+            <span class="nav-link rtx-navlink disabled"><span class="rtx-nav-icon">⬢</span> DataSources</span>
+        </div>
+        <div class="nav-item opacity-60">
+            <span class="nav-link rtx-navlink disabled"><span class="rtx-nav-icon">▭</span> Reportes</span>
+        </div>
+        <div class="nav-item opacity-60">
+            <span class="nav-link rtx-navlink disabled"><span class="rtx-nav-icon">⬣</span> Dashboards</span>
+        </div>
+
+        <div class="rtx-mecha-card mt-4 mx-1">
+            <div class="rtx-mecha-card-blob"></div>
+            <img src="img/logo-cut.png" alt="mecha" class="rtx-mecha-mini" />
+            <div class="small fw-bold">Modo Chibi Activo</div>
+            <div class="small opacity-75">Fase 1 • Bootstrap OK</div>
         </div>
     </nav>
 </div>
+
+<style>
+.rtx-brand { border-bottom: 1px solid rgba(255,255,255,.08); }
+.rtx-logo { filter: drop-shadow(0 6px 12px rgba(0,0,0,.35)); border-radius: 14px; background: #fff; padding: 4px; }
+.rtx-brand-title { color: #fff; font-weight: 800; font-size: 1.15rem; letter-spacing: .02em; line-height: 1; }
+.rtx-brand-sub { color: #FFC84B; font-weight: 800; font-size: 1.05rem; line-height: 1; letter-spacing: .02em; }
+.rtx-brand-tag { color: rgba(255,255,255,.7); font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; }
+.rtx-brand-badge {
+  display: flex; align-items: center; gap: .45rem; justify-content: center;
+  font-size: .62rem; font-weight: 800; letter-spacing: .08em; color: rgba(255,255,255,.85);
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); border-radius: 999px; padding: .35rem .6rem;
+}
+.rtx-nav-section { color: rgba(255,255,255,.55); font-size: .65rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; padding: .5rem .75rem; }
+.rtx-navlink {
+  border-radius: 12px; color: rgba(255,255,255,.88) !important; font-weight: 600; display: flex; align-items: center; gap: .6rem;
+  border: 1px solid transparent;
+}
+.rtx-navlink:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.14); color: #fff !important; }
+.rtx-navlink.active { background: #fff !important; color: #1B2A4E !important; box-shadow: 0 8px 18px rgba(0,0,0,.22); }
+.rtx-nav-icon { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: rgba(255,255,255,.12); font-size: .85rem; }
+.rtx-navlink.active .rtx-nav-icon { background: linear-gradient(135deg, #3A7BD5, #5AA9E6); color: #fff; }
+.rtx-mecha-card {
+  position: relative; overflow: hidden; border-radius: 16px; background: linear-gradient(135deg, #fff 0%, #EAF4FF 100%);
+  padding: 14px; text-align: center; color: #1B2A4E; border: 1px solid rgba(255,255,255,.9);
+}
+.rtx-mecha-card-blob { position: absolute; width: 180px; height: 180px; background: radial-gradient(circle, rgba(255,200,75,.35), transparent 70%); right: -40px; top: -40px; }
+.rtx-mecha-mini { width: 78px; height: auto; filter: drop-shadow(0 8px 14px rgba(0,0,0,.18)); position: relative; }
+</style>
