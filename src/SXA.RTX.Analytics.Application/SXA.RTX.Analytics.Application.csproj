@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SXA.RTX.Analytics.Domain\SXA.RTX.Analytics.Domain.csproj" />
+    <ProjectReference Include="..\SXA.RTX.Analytics.Reporting\SXA.RTX.Analytics.Reporting.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
