@@ -17,22 +17,6 @@
                 <a href="/health" target="_blank" class="btn btn-primary btn-lg">Ver /health →</a>
                 <a href="https://github.com/hector1516/SXA-RTX-Analytics" target="_blank" class="btn btn-outline-light btn-lg rounded-pill" style="border-width:2px">GitHub</a>
             </div>
-            <div class="d-flex flex-wrap gap-2 mt-4">
-                <span class="rtx-pill rtx-pill--sky rtx-pill--animated @(VtiOnline>0?"rtx-pulse":"")" title="VTI con UltimoContacto &lt; 5min" style="animation: rtx-float 3.6s ease-in-out infinite">
-                    <span class="rtx-gauge" style="width:18px;height:18px; flex:0 0 18px"></span>
-                    VTI en línea <strong>@VtiOnline</strong> / @VtiTotal
-                    <span class="rtx-kicker-dot" style="margin-left:.25rem; @(VtiOnline>0?"":"opacity:.25")"></span>
-                </span>
-                <span class="rtx-pill rtx-pill--honey rtx-pill--animated @(VtechOnline>0?"rtx-pulse":"")" title="VTech con UltimoContacto &lt; 5min" style="animation: rtx-float 3.6s ease-in-out infinite .6s">
-                    <span class="rtx-gauge" style="width:18px;height:18px; flex:0 0 18px"></span>
-                    VTech en línea <strong>@VtechOnline</strong> / @VtechTotal
-                    <span class="rtx-kicker-dot" style="margin-left:.25rem; @(VtechOnline>0?"":"opacity:.25")"></span>
-                </span>
-                <span class="rtx-pill rtx-pill--animated" title="Último contacto de cualquier equipo" style="animation: rtx-float 3.6s ease-in-out infinite 1.2s">
-                    <span class="rtx-gauge" style="width:18px;height:18px; flex:0 0 18px; filter: hue-rotate(140deg)"></span>
-                    Última actualización: <strong>@(LastUpdate?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "—")</strong>
-                </span>
-            </div>
         </div>
         <div class="col-lg-5 text-center">
             <img src="img/logo.png" alt="SXA-RTX" class="img-fluid rtx-float" style="max-height: 340px; background: #fff; border-radius: 24px; padding: 12px;" />
@@ -44,6 +28,45 @@
         </div>
     </div>
 </section>
+
+<div class="row g-3 g-lg-4 mb-4">
+    <div class="col-md-4">
+        <div class="card h-100 rtx-pill--animated" style="animation: rtx-float 3.6s ease-in-out infinite">
+            <div class="card-body d-flex align-items-center gap-3">
+                <span class="rtx-gauge" style="width:38px;height:38px; flex:0 0 38px"></span>
+                <div>
+                    <div class="small text-muted fw-bold" style="letter-spacing:.08em">VTI EN LÍNEA</div>
+                    <div class="fs-4 fw-bold" style="color:var(--rtx-navy)"><span class="rtx-kicker-dot" style="display:inline-block; @(VtiOnline>0?"":"opacity:.25")"></span> @VtiOnline <span class="text-muted fw-normal" style="font-size:.9rem">/ @VtiTotal</span></div>
+                </div>
+                <span class="ms-auto rtx-pill rtx-pill--sky">@(VtiOnline>0?"● En línea":"○ Sin línea")</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 rtx-pill--animated" style="animation: rtx-float 3.6s ease-in-out infinite .6s">
+            <div class="card-body d-flex align-items-center gap-3">
+                <span class="rtx-gauge" style="width:38px;height:38px; flex:0 0 38px; filter: hue-rotate(25deg)"></span>
+                <div>
+                    <div class="small text-muted fw-bold" style="letter-spacing:.08em">VTECH EN LÍNEA</div>
+                    <div class="fs-4 fw-bold" style="color:var(--rtx-navy)"><span class="rtx-kicker-dot" style="display:inline-block; @(VtechOnline>0?"":"opacity:.25"); background:var(--rtx-honey-deep)"></span> @VtechOnline <span class="text-muted fw-normal" style="font-size:.9rem">/ @VtechTotal</span></div>
+                </div>
+                <span class="ms-auto rtx-pill rtx-pill--honey">@(VtechOnline>0?"● En línea":"○ Sin línea")</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 rtx-pill--animated" style="animation: rtx-float 3.6s ease-in-out infinite 1.2s">
+            <div class="card-body d-flex align-items-center gap-3">
+                <span class="rtx-gauge" style="width:38px;height:38px; flex:0 0 38px; filter: hue-rotate(140deg)"></span>
+                <div>
+                    <div class="small text-muted fw-bold" style="letter-spacing:.08em">ÚLTIMA ACTUALIZACIÓN</div>
+                    <div class="fw-bold" style="color:var(--rtx-navy)">@(LastUpdate?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "—")</div>
+                    <div class="small text-muted">@(LastUpdate.HasValue ? ((DateTime.UtcNow - LastUpdate.Value).TotalMinutes < 5 ? "hace segundos" : $"hace {(int)(DateTime.UtcNow - LastUpdate.Value).TotalMinutes} min") : "sin datos")</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="card">
     <div class="card-body d-flex flex-wrap gap-3 align-items-center justify-content-between">
@@ -72,12 +95,9 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Cargar equipos para pills
         try
         {
-            // Usa la misma cadena que Configuración (si está vacía, usa demo InMemory)
             var cs = Config.GetConnectionString("ConfigurationDatabase");
-            // Si está vacía, EquipoService devolverá demo 2+2
             var catalog = await EquipoService.GetCatalogAsync(cs);
             VtiTotal = catalog.Count(c => string.Equals(c.TipoMaquina, "VTI", StringComparison.OrdinalIgnoreCase));
             VtechTotal = catalog.Count(c => string.Equals(c.TipoMaquina, "VTech", StringComparison.OrdinalIgnoreCase));
@@ -87,8 +107,6 @@
             LastUpdate = catalog.Where(c => c.UltimoContacto.HasValue).MaxBy(c => c.UltimoContacto!.Value)?.UltimoContacto;
         }
         catch { }
-
-        // Checks SQL / MAPICS en background
         _ = CheckConnections();
     }
 
@@ -97,25 +115,11 @@
         try
         {
             var cs = Config.GetConnectionString("ConfigurationDatabase");
-            if (string.IsNullOrWhiteSpace(cs))
-            {
-                SqlOk = null; SqlMsg = "InMemory (sin SQL Server)";
-                OdbcOk = null; OdbcMsg = "DSN=MAPICS (no probado)";
-            }
-            else
-            {
-                var (ok, msg) = await SystemService.TestSqlConnectionAsync(cs);
-                SqlOk = ok; SqlMsg = msg;
-            }
+            if (string.IsNullOrWhiteSpace(cs)) { SqlOk = null; SqlMsg = "InMemory (sin SQL Server)"; OdbcOk = null; OdbcMsg = "DSN=MAPICS (no probado)"; }
+            else { var (ok, msg) = await SystemService.TestSqlConnectionAsync(cs); SqlOk = ok; SqlMsg = msg; }
         }
         catch (Exception ex) { SqlOk = false; SqlMsg = ex.Message; }
-        try
-        {
-            var odbc = "DSN=MAPICS;";
-            var (ok, msg) = await SystemService.TestOdbcConnectionAsync(odbc);
-            OdbcOk = ok; OdbcMsg = msg;
-        }
-        catch (Exception ex) { OdbcOk = false; OdbcMsg = ex.Message; }
+        try { var (ok, msg) = await SystemService.TestOdbcConnectionAsync("DSN=MAPICS;"); OdbcOk = ok; OdbcMsg = msg; } catch (Exception ex) { OdbcOk = false; OdbcMsg = ex.Message; }
         StateHasChanged();
     }
 }
