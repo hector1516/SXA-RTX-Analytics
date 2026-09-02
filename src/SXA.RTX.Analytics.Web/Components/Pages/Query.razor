@@ -15,32 +15,27 @@
 <PageTitle>Consulta — SXA-RTX Analytics</PageTitle>
 
 <h3 class="fw-bold" style="letter-spacing:-.02em">Consulta dinámica</h3>
-<p class="text-muted small">Elige tabla (filtrada por <code>SXA_RTX_TablasConfig VTI/VTech</code>), columnas y filtros. Conexión rápida con pooling, <code>TOP</code> y parámetros.</p>
+<p class="text-muted small">Elige tabla (filtrada por <code>SXA_RTX_TablasConfig VTI/VTech</code>), columnas y filtros.</p>
 
 <div class="card mb-3">
     <div class="card-body">
         <div class="row g-3">
-            <div class="col-md-4">
-                <label class="form-label small fw-bold">Conexión SQL (operacional)</label>
-                <input class="form-control form-control-sm font-monospace" @bind="ConnStr" placeholder="Server=...;Database=...;User Id=...;Password=...;Encrypt=True;TrustServerCertificate=True;" />
-                <div class="form-text">Vacío usa demo (InMemory). Para probar con original, pega la cadena.</div>
-            </div>
-            <div class="col-md-2">
+            <div class="col-md-3">
                 <label class="form-label small fw-bold">Tipo</label>
                 <select class="form-select form-select-sm" @bind="FiltroTipo"><option value="">Todos</option><option value="VTI">VTI</option><option value="VTech">VTech</option></select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <label class="form-label small fw-bold">Tabla</label>
                 <select class="form-select form-select-sm" @bind="SelectedTable" @bind:after="OnTableChanged">
                     <option value="">— selecciona —</option>
                     @foreach (var t in TablasFiltradas) { <option value="@t">@t</option> }
                 </select>
-                <div class="form-text"><a href="#" @onclick:preventDefault="true" @onclick="LoadTablas">Recargar tablas</a> (@TablasFiltradas.Count)</div>
+                <div class="form-text"><a href="#" @onclick:preventDefault="true" @onclick="LoadTablas">Recargar tablas</a> (@TablasFiltradas.Count) — usa la conexión de <code>/configuration</code></div>
             </div>
-            <div class="col-md-3 d-flex align-items-end gap-2">
+            <div class="col-md-5 d-flex align-items-end gap-2">
                 <button class="btn btn-primary btn-sm" @onclick="Ejecutar" disabled="@IsRunning">@if (IsRunning) { <span class="spinner-border spinner-border-sm"></span> } else { @("Ejecutar") }</button>
-                <button class="btn btn-outline-primary btn-sm" @onclick="ExportExcel" disabled="@(Result==null)">Excel</button>
-                <button class="btn btn-outline-secondary btn-sm" @onclick="ExportPdf" disabled="@(Result==null)">PDF</button>
+                <button class="btn btn-primary btn-sm" @onclick="ExportExcel" disabled="@(Result==null)" style="min-width:92px">📊 Excel</button>
+                <button class="btn btn-primary btn-sm" @onclick="ExportPdf" disabled="@(Result==null)" style="min-width:92px">📄 PDF</button>
             </div>
         </div>
 
