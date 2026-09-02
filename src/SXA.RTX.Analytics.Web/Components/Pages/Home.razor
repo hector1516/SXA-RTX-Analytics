@@ -16,7 +16,6 @@
             <h1 class="display-5 mb-3">SXA-RTX<br />Analytics</h1>
             <p class="lead mb-4">Plataforma interna de reporting.</p>
             <div class="d-flex flex-wrap gap-2">
-                <a href="/health" target="_blank" class="btn btn-primary btn-lg">Ver /health →</a>
                 <a href="https://github.com/hector1516/SXA-RTX-Analytics" target="_blank" class="btn btn-outline-light btn-lg rounded-pill" style="border-width:2px">GitHub</a>
             </div>
         </div>
@@ -165,8 +164,6 @@
             <span class="rtx-pill @(OdbcOk==true?"rtx-pill--mint": OdbcOk==false?"bg-danger text-white":"")" title="@OdbcMsg">
                 MAPICS @(OdbcOk==true ? "✓" : OdbcOk==false ? "✕" : "…") @(OdbcOk==null ? "verificando..." : OdbcOk==true ? "Conectado" : "No conectado")
             </span>
-            <a href="/health" target="_blank" class="btn btn-outline-primary btn-sm">/health JSON</a>
-            <a href="/health/live" target="_blank" class="btn btn-primary btn-sm">/health/live</a>
         </div>
     </div>
 </div>
