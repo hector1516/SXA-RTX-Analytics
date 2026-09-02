@@ -144,6 +144,7 @@ a:hover { color: var(--rtx-navy); }
 .rtx-pill--honey { background: linear-gradient(135deg, #FFF6D6, #FFE69B); border-color: #FFD666; color: #7A5A00; }
 .rtx-pill--mint { background: var(--rtx-mint-soft); border-color: #B8F5D1; color: #0B7A3E; }
 .rtx-pill--sky { background: #EAF4FF; border-color: #C5DEFF; color: #1B4A8A; }
+.rtx-pill--animated { box-shadow: 0 8px 20px rgba(27,42,78,.14), 0 2px 8px rgba(0,0,0,.08); border-width: 2px; backdrop-filter: blur(6px); }
 
 /* Tiny gauges like the logo's manometers */
 .rtx-gauge {
