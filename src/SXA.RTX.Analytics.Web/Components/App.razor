@@ -17,29 +17,32 @@
 <body>
     <Routes />
 
-    <!-- Modal de reconexión en español (reemplaza "Rejoining the server...") -->
+    <!-- Toast discreto de reconexión (antes barra inferior) -->
     <div id="components-reconnect-modal" class="components-reconnect-hide">
         <div class="components-reconnect-current">
-            <div style="display:flex;align-items:center;gap:.75rem;justify-content:center;padding:1rem">
-                <span class="spinner-border spinner-border-sm" role="status"></span>
-                <span>Reconectando con el servidor...</span>
+            <div style="display:flex;align-items:center;gap:.6rem;padding:.6rem .9rem;background:#fff;border:1px solid #D9E2EC;border-radius:999px;box-shadow:0 8px 20px rgba(27,42,78,.14);font-size:.82rem;font-weight:600">
+                <span class="spinner-border spinner-border-sm" style="width:1rem;height:1rem" role="status"></span>
+                <span>Reconectando...</span>
             </div>
         </div>
         <div class="components-reconnect-failed">
-            <div style="text-align:center;padding:1rem">
-                <div class="fw-bold">No se pudo reconectar</div>
-                <div class="small text-muted">Intenta recargar la página.</div>
-                <button class="btn btn-primary btn-sm mt-2" onclick="window.Blazor.reconnect()">Reintentar</button>
+            <div style="display:flex;align-items:center;gap:.6rem;padding:.6rem .9rem;background:#fff;border:1px solid #F5C6CB;border-radius:999px;box-shadow:0 8px 20px rgba(27,42,78,.14);font-size:.82rem">
+                <span class="fw-bold">Sin conexión</span>
+                <button class="btn btn-primary btn-sm py-0" style="font-size:.75rem" onclick="window.Blazor.reconnect()">Reintentar</button>
             </div>
         </div>
         <div class="components-reconnect-rejected">
-            <div style="text-align:center;padding:1rem">
-                <div class="fw-bold">Conexión rechazada</div>
-                <div class="small text-muted">Recarga la página para continuar.</div>
-                <button class="btn btn-primary btn-sm mt-2" onclick="location.reload()">Recargar</button>
+            <div style="display:flex;align-items:center;gap:.6rem;padding:.6rem .9rem;background:#fff;border:1px solid #F5C6CB;border-radius:999px;box-shadow:0 8px 20px rgba(27,42,78,.14);font-size:.82rem">
+                <span class="fw-bold">Conexión cerrada</span>
+                <button class="btn btn-primary btn-sm py-0" style="font-size:.75rem" onclick="location.reload()">Recargar</button>
             </div>
         </div>
     </div>
+    <style>
+        #components-reconnect-modal { position: fixed; top: 1rem; right: 1rem; bottom: auto; left: auto; width: auto; max-width: 90vw; z-index: 9999; background: transparent; border: none; box-shadow: none; padding: 0; }
+        #components-reconnect-modal.components-reconnect-hide { display: none; }
+        #components-reconnect-modal.components-reconnect-show, #components-reconnect-modal.components-reconnect-failed, #components-reconnect-modal.components-reconnect-rejected { display: block; }
+    </style>
 
     <script src="js/auth.js"></script>
     <script src="@Assets["_framework/blazor.web.js"]"></script>
