@@ -1,27 +1,32 @@
 ﻿@page "/"
+@rendermode InteractiveServer
+@using SXA.RTX.Analytics.Application.Abstractions
+@inject IEquipoService EquipoService
+@inject ISystemTableService SystemService
+@inject IConfiguration Config
 
 <PageTitle>SXA-RTX Analytics — ECCSA</PageTitle>
 
 <section class="rtx-hero p-4 p-lg-5 mb-4">
     <div class="row align-items-center g-4 rtx-hero-grid">
         <div class="col-lg-7">
-            <div class="rtx-kicker mb-3"><span class="rtx-kicker-dot"></span> Fase 1 • Bootstrap completado — 9/9 tests</div>
+            <div class="rtx-kicker mb-3"><span class="rtx-kicker-dot"></span> SXA-RTX Analytics — ECCSA Automation</div>
             <h1 class="display-5 mb-3">SXA-RTX<br />Analytics</h1>
-            <p class="lead mb-4">
-                Plataforma interna de reporting.<br />
-                Tanques <span class="badge rounded-pill" style="background:var(--rtx-honey);color:#5A3D00">PROPANO</span>
-                <span class="badge rounded-pill bg-white text-dark border">OTRO</span>
-                <span class="badge rounded-pill" style="background:#D9E2EC">CHÍMICO</span> listos para conectar.
-            </p>
+            <p class="lead mb-4">Plataforma interna de reporting.</p>
             <div class="d-flex flex-wrap gap-2">
                 <a href="/health" target="_blank" class="btn btn-primary btn-lg">Ver /health →</a>
                 <a href="https://github.com/hector1516/SXA-RTX-Analytics" target="_blank" class="btn btn-outline-light btn-lg rounded-pill" style="border-width:2px">GitHub</a>
             </div>
             <div class="d-flex flex-wrap gap-2 mt-4">
-                <span class="rtx-pill rtx-pill--mint"><span class="rtx-kicker-dot"></span> Healthy</span>
-                <span class="rtx-pill rtx-pill--sky">Blazor SSR</span>
-                <span class="rtx-pill rtx-pill--honey">InMemory → SQL Server</span>
-                <span class="rtx-pill">Serilog + HealthChecks</span>
+                <span class="rtx-pill @(VtiOnline>0?"rtx-pill--sky":"")" title="VTI con UltimoContacto &lt; 5min">
+                    ● VTI en línea <strong>@VtiOnline</strong> / @VtiTotal
+                </span>
+                <span class="rtx-pill @(VtechOnline>0?"rtx-pill--honey":"")" title="VTech con UltimoContacto &lt; 5min">
+                    ● VTech en línea <strong>@VtechOnline</strong> / @VtechTotal
+                </span>
+                <span class="rtx-pill" title="Último contacto de cualquier equipo">
+                    Última actualización: <strong>@(LastUpdate?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "—")</strong>
+                </span>
             </div>
         </div>
         <div class="col-lg-5 text-center">
@@ -35,54 +40,77 @@
     </div>
 </section>
 
-<div class="row g-3 g-lg-4">
-    <div class="col-md-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <div class="d-flex align-items-center gap-2 mb-2">
-                    <span class="rtx-gauge" style="width:32px;height:32px"></span>
-                    <h5 class="card-title mb-0">Arquitectura</h5>
-                </div>
-                <p class="card-text text-muted">Domain / Application / Infrastructure / Reporting / Web — separación limpia. Reporting desacoplado para usarlo desde Blazor, API, jobs y export.</p>
-                <div class="d-flex gap-2 flex-wrap">
-                    <span class="rtx-pill rtx-pill--sky">IDataSourceProvider</span>
-                    <span class="rtx-pill">Query → Result</span>
-                </div>
-            </div>
+<div class="card">
+    <div class="card-body d-flex flex-wrap gap-3 align-items-center justify-content-between">
+        <div>
+            <div class="fw-bold">Estado del sistema</div>
+            <div class="text-muted small">Verifica conexión a SQL Server y MAPICS (ODBC).</div>
         </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card h-100" style="border-top: 4px solid var(--rtx-honey)">
-            <div class="card-body">
-                <h5 class="card-title">Reporting Engine</h5>
-                <p class="card-text text-muted"><code>DataSource → Query → QueryResult → Report → Visualization → Dashboard</code> — sin recompilar, con solo lectura.</p>
-                <div class="rtx-pill rtx-pill--honey">SqlServer ✓ &nbsp; ODBC (MAPICS) próximo</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card h-100" style="border-top: 4px solid var(--rtx-mint)">
-            <div class="card-body">
-                <h5 class="card-title">Próximos pasos</h5>
-                <ol class="mb-0 small text-muted ps-3">
-                    <li><code>dotnet user-secrets set ConnectionStrings:ConfigurationDatabase "Server=...;Database=SXA_RTX_Analytics;..."</code></li>
-                    <li><code>dotnet ef migrations add Initial --project src/SXA.RTX.Analytics.Infrastructure</code></li>
-                    <li>Configurar DataSources y permisos</li>
-                </ol>
-            </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <span class="rtx-pill @(SqlOk==true?"rtx-pill--mint": SqlOk==false?"bg-danger text-white":"")" title="@SqlMsg">
+                SQL @(SqlOk==true ? "✓" : SqlOk==false ? "✕" : "…") @(SqlOk==null ? "verificando..." : SqlOk==true ? "Conectado" : "No conectado")
+            </span>
+            <span class="rtx-pill @(OdbcOk==true?"rtx-pill--mint": OdbcOk==false?"bg-danger text-white":"")" title="@OdbcMsg">
+                MAPICS @(OdbcOk==true ? "✓" : OdbcOk==false ? "✕" : "…") @(OdbcOk==null ? "verificando..." : OdbcOk==true ? "Conectado" : "No conectado")
+            </span>
+            <a href="/health" target="_blank" class="btn btn-outline-primary btn-sm">/health JSON</a>
+            <a href="/health/live" target="_blank" class="btn btn-primary btn-sm">/health/live</a>
         </div>
     </div>
 </div>
 
-<div class="card mt-4">
-    <div class="card-body d-flex flex-wrap gap-3 align-items-center justify-content-between">
-        <div>
-            <div class="fw-bold">Estado del sistema</div>
-            <div class="text-muted small">Si <code>ConfigurationDatabase</code> está vacío usa InMemory. En prod usa cuenta de solo lectura.</div>
-        </div>
-        <div class="d-flex gap-2">
-            <a href="/health" target="_blank" class="btn btn-outline-primary">/health JSON</a>
-            <a href="/health/live" target="_blank" class="btn btn-primary">/health/live</a>
-        </div>
-    </div>
-</div>
+@code {
+    int VtiTotal, VtechTotal, VtiOnline, VtechOnline;
+    DateTime? LastUpdate;
+    bool? SqlOk, OdbcOk;
+    string? SqlMsg, OdbcMsg;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Cargar equipos para pills
+        try
+        {
+            // Usa la misma cadena que Configuración (si está vacía, usa demo InMemory)
+            var cs = Config.GetConnectionString("ConfigurationDatabase");
+            // Si está vacía, EquipoService devolverá demo 2+2
+            var catalog = await EquipoService.GetCatalogAsync(cs);
+            VtiTotal = catalog.Count(c => string.Equals(c.TipoMaquina, "VTI", StringComparison.OrdinalIgnoreCase));
+            VtechTotal = catalog.Count(c => string.Equals(c.TipoMaquina, "VTech", StringComparison.OrdinalIgnoreCase));
+            var threshold = DateTime.UtcNow.AddMinutes(-5);
+            VtiOnline = catalog.Count(c => string.Equals(c.TipoMaquina, "VTI", StringComparison.OrdinalIgnoreCase) && c.UltimoContacto.HasValue && c.UltimoContacto.Value > threshold);
+            VtechOnline = catalog.Count(c => string.Equals(c.TipoMaquina, "VTech", StringComparison.OrdinalIgnoreCase) && c.UltimoContacto.HasValue && c.UltimoContacto.Value > threshold);
+            LastUpdate = catalog.Where(c => c.UltimoContacto.HasValue).MaxBy(c => c.UltimoContacto!.Value)?.UltimoContacto;
+        }
+        catch { }
+
+        // Checks SQL / MAPICS en background
+        _ = CheckConnections();
+    }
+
+    async Task CheckConnections()
+    {
+        try
+        {
+            var cs = Config.GetConnectionString("ConfigurationDatabase");
+            if (string.IsNullOrWhiteSpace(cs))
+            {
+                SqlOk = null; SqlMsg = "InMemory (sin SQL Server)";
+                OdbcOk = null; OdbcMsg = "DSN=MAPICS (no probado)";
+            }
+            else
+            {
+                var (ok, msg) = await SystemService.TestSqlConnectionAsync(cs);
+                SqlOk = ok; SqlMsg = msg;
+            }
+        }
+        catch (Exception ex) { SqlOk = false; SqlMsg = ex.Message; }
+        try
+        {
+            var odbc = "DSN=MAPICS;";
+            var (ok, msg) = await SystemService.TestOdbcConnectionAsync(odbc);
+            OdbcOk = ok; OdbcMsg = msg;
+        }
+        catch (Exception ex) { OdbcOk = false; OdbcMsg = ex.Message; }
+        StateHasChanged();
+    }
+}
