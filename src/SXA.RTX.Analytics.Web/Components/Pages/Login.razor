@@ -71,7 +71,7 @@
         try
         {
             var payload = System.Text.Json.JsonSerializer.Serialize(new { Username = Username.Trim(), Password = Password });
-            var js = "await (await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:" + System.Text.Json.JsonSerializer.Serialize(payload) + "})).text()";
+            var js = "await (await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:'" + payload.Replace("'", "\\'") + "'})).text()";
             var json = await JS.InvokeAsync<string>("eval", js);
             var doc = System.Text.Json.JsonDocument.Parse(json);
             var success = doc.RootElement.TryGetProperty("success", out var s) && s.GetBoolean();
