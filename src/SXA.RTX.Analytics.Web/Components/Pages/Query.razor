@@ -1,0 +1,189 @@
+@page "/query"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using SXA.RTX.Analytics.Application.Abstractions
+@using SXA.RTX.Analytics.Domain.Enums
+@using SXA.RTX.Analytics.Reporting.Models
+@inject IDynamicQueryService QueryService
+@inject ITablasConfigService TablasService
+@inject IEquipoService EquipoService
+@inject IExportService ExportService
+@inject IJSRuntime JS
+@inject IConfiguration Config
+
+<PageTitle>Consulta — SXA-RTX Analytics</PageTitle>
+
+<h3 class="fw-bold" style="letter-spacing:-.02em">Consulta dinámica</h3>
+<p class="text-muted small">Elige tabla (filtrada por <code>SXA_RTX_TablasConfig VTI/VTech</code>), columnas y filtros. Conexión rápida con pooling, <code>TOP</code> y parámetros.</p>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label small fw-bold">Conexión SQL (operacional)</label>
+                <input class="form-control form-control-sm font-monospace" @bind="ConnStr" placeholder="Server=...;Database=...;User Id=...;Password=...;Encrypt=True;TrustServerCertificate=True;" />
+                <div class="form-text">Vacío usa demo (InMemory). Para probar con original, pega la cadena.</div>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Tipo</label>
+                <select class="form-select form-select-sm" @bind="FiltroTipo"><option value="">Todos</option><option value="VTI">VTI</option><option value="VTech">VTech</option></select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold">Tabla</label>
+                <select class="form-select form-select-sm" @bind="SelectedTable" @bind:after="OnTableChanged">
+                    <option value="">— selecciona —</option>
+                    @foreach (var t in TablasFiltradas) { <option value="@t">@t</option> }
+                </select>
+                <div class="form-text"><a href="#" @onclick:preventDefault="true" @onclick="LoadTablas">Recargar tablas</a> (@TablasFiltradas.Count)</div>
+            </div>
+            <div class="col-md-3 d-flex align-items-end gap-2">
+                <button class="btn btn-primary btn-sm" @onclick="Ejecutar" disabled="@IsRunning">@if (IsRunning) { <span class="spinner-border spinner-border-sm"></span> } else { @("Ejecutar") }</button>
+                <button class="btn btn-outline-primary btn-sm" @onclick="ExportExcel" disabled="@(Result==null)">Excel</button>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="ExportPdf" disabled="@(Result==null)">PDF</button>
+            </div>
+        </div>
+
+        @if (Columns.Count>0)
+        {
+            <div class="mt-3">
+                <label class="form-label small fw-bold">Columnas</label>
+                <div class="d-flex flex-wrap gap-2">
+                    @foreach (var c in Columns)
+                    {
+                        <label class="d-flex align-items-center gap-1 border rounded-3 px-2 py-1 small bg-white">
+                            <input type="checkbox" checked="@SelectedColumns.Contains(c.Name)" @onchange="e => ToggleCol(c.Name, (bool)(e.Value??false))" />
+                            @c.Name <span class="text-muted" style="font-size:.65rem">(@c.DataType)</span>
+                        </label>
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="row g-3 mt-1">
+            <div class="col-md-2"><label class="form-label small">Área</label><input class="form-control form-control-sm" @bind="FiltroArea" placeholder="Todas" list="areasQuery" /><datalist id="areasQuery">@foreach (var a in Areas) { <option value="@a"></option> }</datalist></div>
+            <div class="col-md-3">
+                <label class="form-label small">Equipo (DeviceId)</label>
+                <select class="form-select form-select-sm" @bind="FiltroDevice"><option value="">Todos</option>@foreach (var d in Catalog) { <option value="@d.DeviceId">@d.DeviceId — @d.NombrePC (@d.TipoMaquina)</option> }</select>
+            </div>
+            <div class="col-md-2"><label class="form-label small">Desde</label><input type="datetime-local" class="form-control form-control-sm" @bind="FiltroFrom" /></div>
+            <div class="col-md-2"><label class="form-label small">Hasta</label><input type="datetime-local" class="form-control form-control-sm" @bind="FiltroTo" /></div>
+            <div class="col-md-2"><label class="form-label small">Columna fecha</label><select class="form-select form-select-sm" @bind="DateColumn"><option value="">autodetect</option>@foreach (var c in Columns.Where(x=>x.DataType.Contains("date", StringComparison.OrdinalIgnoreCase)||x.Name.Contains("fecha", StringComparison.OrdinalIgnoreCase))) { <option value="@c.Name">@c.Name</option> }</select></div>
+            <div class="col-md-1 d-flex align-items-end"><span class="small text-muted">Top <input type="number" style="width:60px" class="form-control form-control-sm d-inline" @bind="MaxRows" /></span></div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(Msg)) { <div class="alert @(Ok?"alert-success":"alert-danger") mt-3 py-2 small">@Msg</div> }
+    </div>
+</div>
+
+@if (Result != null)
+{
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Resultado — @Result.Rows.Count filas en @Result.ExecutionTime.TotalMilliseconds.ToString("F0") ms @(Result.IsTruncated?"(truncado)":"")</span>
+            <span class="small text-muted">@Result.Columns.Count columnas</span>
+        </div>
+        <div class="table-responsive" style="max-height:320px; overflow:auto">
+            <table class="table table-sm small mb-0">
+                <thead style="position:sticky; top:0; background:#fff"><tr>@foreach (var c in Result.Columns) { <th>@c.Name</th> }</tr></thead>
+                <tbody>@foreach (var r in Result.Rows.Take(200)) { <tr>@foreach (var v in r) { <td>@(v?.ToString() ?? "")</td> }</tr> }</tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                <h6 class="mb-0">Gráfica</h6>
+                <select class="form-select form-select-sm" style="width:160px" @bind="ChartType"><option value="barras">Barras</option><option value="lineas">Líneas</option><option value="pastel">Pastel</option><option value="area">Área</option><option value="kpi">KPI</option></select>
+                <select class="form-select form-select-sm" style="width:160px" @bind="ChartX"><option value="">Eje X</option>@foreach (var c in Result.Columns) { <option value="@c.Name">@c.Name</option> }</select>
+                <select class="form-select form-select-sm" style="width:160px" @bind="ChartY"><option value="">Eje Y (numérico)</option>@foreach (var c in Result.Columns) { <option value="@c.Name">@c.Name</option> }</select>
+                <button class="btn btn-sm btn-primary" @onclick="RenderChart">Renderizar</button>
+            </div>
+            <div style="height:280px"><canvas id="qChart"></canvas></div>
+            @if (ChartType=="kpi" && Result.Rows.Count>0) { <div class="display-6 fw-bold mt-2" style="color:var(--rtx-navy)">@KpiValue</div><div class="small text-muted">KPI: @ChartY (@ChartAgg)</div> }
+        </div>
+    </div>
+}
+
+@code {
+    string ConnStr = "";
+    string FiltroTipo = "";
+    string SelectedTable = "";
+    List<string> AllTablas = new();
+    List<string> TablasFiltradas => string.IsNullOrEmpty(FiltroTipo) ? AllTablas : AllTablas.Where(t => {
+        var sel = SelectedConfig.FirstOrDefault(x=>x.TableName==t);
+        if (sel.TableName==null) return false;
+        return sel.Tipo.ToString()==FiltroTipo;
+    }).ToList();
+    List<(string TableName, EquipoTipo Tipo)> SelectedConfig = new();
+    List<ColumnInfo> Columns = new();
+    HashSet<string> SelectedColumns = new();
+    string FiltroArea = ""; string FiltroDevice = ""; DateTime? FiltroFrom, FiltroTo; string DateColumn = ""; int MaxRows = 500;
+    List<CatalogDeviceDto> Catalog = new(); List<string> Areas = new();
+    QueryResult? Result; bool IsRunning; string? Msg; bool Ok;
+    string ChartType="barras", ChartX="", ChartY="", ChartAgg="COUNT"; string KpiValue="";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var cs = Config.GetConnectionString("ConfigurationDatabase");
+        ConnStr = cs ?? "";
+        Catalog = (await EquipoService.GetCatalogAsync(cs)).ToList();
+        Areas = (await EquipoService.GetEquiposAsync()).Select(e=>e.Area).Distinct().ToList();
+        await LoadTablas();
+    }
+    async Task LoadTablas(){
+        var list = await TablasService.ListAllTablesAsync(ConnStr);
+        AllTablas = list.ToList();
+        SelectedConfig = (await TablasService.GetConfigAsync()).Select(x=>(x.TableName, x.Tipo)).ToList();
+        if (!string.IsNullOrEmpty(SelectedTable) && !AllTablas.Contains(SelectedTable)) SelectedTable="";
+    }
+    async Task OnTableChanged(){
+        if (string.IsNullOrEmpty(SelectedTable)) { Columns.Clear(); return; }
+        Columns = (await QueryService.GetColumnsAsync(ConnStr, SelectedTable)).ToList();
+        SelectedColumns = new HashSet<string>(Columns.Select(c=>c.Name));
+        var dateCol = Columns.FirstOrDefault(c=>c.DataType.Contains("date", StringComparison.OrdinalIgnoreCase)||c.Name.Contains("fecha", StringComparison.OrdinalIgnoreCase));
+        DateColumn = dateCol?.Name ?? "";
+    }
+    void ToggleCol(string name, bool isChecked){ if(isChecked) SelectedColumns.Add(name); else SelectedColumns.Remove(name); }
+
+    async Task Ejecutar(){
+        if (string.IsNullOrEmpty(SelectedTable)) { Msg="Selecciona tabla"; Ok=false; return; }
+        IsRunning=true; Msg=null;
+        var req = new DynamicQueryRequest(ConnStr, SelectedTable, SelectedColumns.ToList(), string.IsNullOrEmpty(FiltroTipo)?null:FiltroTipo, string.IsNullOrEmpty(FiltroArea)?null:FiltroArea, string.IsNullOrEmpty(FiltroDevice)?null:FiltroDevice, FiltroFrom, FiltroTo, string.IsNullOrEmpty(DateColumn)?null:DateColumn, MaxRows);
+        Result = await QueryService.ExecuteAsync(req);
+        Msg = $"{Result.Rows.Count} filas en {Result.ExecutionTime.TotalMilliseconds:F0} ms"; Ok=true; IsRunning=false;
+        // Auto-select chart axes
+        if (Result.Columns.Count>=2){ ChartX = Result.Columns[0].Name; ChartY = Result.Columns.FirstOrDefault(c=>c.DataType.Name.Contains("Int", StringComparison.OrdinalIgnoreCase)||c.DataType.Name.Contains("Single", StringComparison.OrdinalIgnoreCase) || c.DataType.Name.Contains("Double", StringComparison.OrdinalIgnoreCase) || c.DataType.Name.Contains("Float", StringComparison.OrdinalIgnoreCase)||c.DataType.Name.Contains("Decimal", StringComparison.OrdinalIgnoreCase))?.Name ?? Result.Columns[1].Name; }
+    }
+
+    async Task RenderChart(){
+        if (Result==null || string.IsNullOrEmpty(ChartX) || string.IsNullOrEmpty(ChartY) && ChartType!="kpi") return;
+        if (ChartType=="kpi"){
+            var idx = Result.Columns.ToList().FindIndex(c=>c.Name==ChartY);
+            if (idx>=0){ var vals = Result.Rows.Select(r=> Convert.ToDouble(r[idx] ?? 0)).ToList(); KpiValue = vals.Sum().ToString("N2"); }
+            return;
+        }
+        var xi = Result.Columns.ToList().FindIndex(c=>c.Name==ChartX);
+        var yi = Result.Columns.ToList().FindIndex(c=>c.Name==ChartY);
+        if (xi<0||yi<0) return;
+        var labels = Result.Rows.Select(r=> r[xi]?.ToString() ?? "").Take(30).ToList();
+        var values = Result.Rows.Select(r=> { var v=r[yi]; return v==null?0: Convert.ToDouble(v); }).Take(30).ToList();
+        var type = ChartType=="barras"?"bar": ChartType=="lineas"?"line": ChartType=="pastel"?"pie":"line";
+        if (ChartType=="area") type="line";
+        await JS.InvokeVoidAsync("renderChart", "qChart", ChartType=="pastel"?"pastel": ChartType=="area"?"area":type, labels, values, ChartY);
+    }
+
+    async Task ExportExcel(){
+        if (Result==null) return;
+        var bytes = await ExportService.ExportExcelAsync(Result, SelectedTable);
+        var b64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("eval", $"var a=document.createElement('a');a.href='data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}';a.download='consulta-'+new Date().toISOString().slice(0,10)+'.xlsx';document.body.appendChild(a);a.click();a.remove();");
+    }
+    async Task ExportPdf(){
+        if (Result==null) return;
+        var bytes = await ExportService.ExportPdfAsync(Result, SelectedTable);
+        var b64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("eval", $"var a=document.createElement('a');a.href='data:application/pdf;base64,{b64}';a.download='grafica-'+new Date().toISOString().slice(0,10)+'.pdf';document.body.appendChild(a);a.click();a.remove();");
+    }
+}
