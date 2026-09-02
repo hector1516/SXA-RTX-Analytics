@@ -1,7 +1,9 @@
 ﻿@page "/"
 @rendermode InteractiveServer
 @using SXA.RTX.Analytics.Application.Abstractions
+@using SXA.RTX.Analytics.Domain.Enums
 @inject IEquipoService EquipoService
+@inject ITablasConfigService TablasService
 @inject ISystemTableService SystemService
 @inject IConfiguration Config
 
@@ -21,8 +23,8 @@
         <div class="col-lg-5 text-center">
             <img src="img/logo.png" alt="SXA-RTX" class="img-fluid rtx-float" style="max-height: 340px; background: #fff; border-radius: 24px; padding: 12px;" />
             <div class="d-flex justify-content-center gap-2 mt-3">
-                <span class="rtx-gauge" title="Presión PROPANO"></span>
-                <span class="rtx-gauge" title="Presión OTRO" style="transform: rotate(18deg)"></span>
+                <span class="rtx-gauge rtx-float" title="Presión PROPANO" style="animation-duration: 3.2s"></span>
+                <span class="rtx-gauge rtx-float" title="Presión OTRO" style="transform: rotate(18deg); animation-duration: 3.8s; animation-delay:.4s"></span>
                 <span class="rtx-pill rtx-pill--honey">OK • ACTIVE</span>
             </div>
         </div>
@@ -31,21 +33,21 @@
 
 <div class="row g-3 g-lg-4 mb-4">
     <div class="col-md-4">
-        <div class="card h-100 rtx-pill--animated" style="animation: rtx-float 3.6s ease-in-out infinite">
+        <div class="card h-100">
             <div class="card-body d-flex align-items-center gap-3">
-                <span class="rtx-gauge" style="width:38px;height:38px; flex:0 0 38px"></span>
+                <span class="rtx-gauge rtx-float" style="width:38px;height:38px; flex:0 0 38px; animation-duration:3s"></span>
                 <div>
                     <div class="small text-muted fw-bold" style="letter-spacing:.08em">VTI EN LÍNEA</div>
-                    <div class="fs-4 fw-bold" style="color:var(--rtx-navy)"><span class="rtx-kicker-dot" style="display:inline-block; @(VtiOnline>0?"":"opacity:.25")"></span> @VtiOnline <span class="text-muted fw-normal" style="font-size:.9rem">/ @VtiTotal</span></div>
+                    <div class="fs-4 fw-bold" style="color:var(--rtx-navy)"><span class="rtx-kicker-dot rtx-pulse" style="display:inline-block; @(VtiOnline>0?"":"opacity:.25")"></span> @VtiOnline <span class="text-muted fw-normal" style="font-size:.9rem">/ @VtiTotal</span></div>
                 </div>
                 <span class="ms-auto rtx-pill rtx-pill--sky">@(VtiOnline>0?"● En línea":"○ Sin línea")</span>
             </div>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card h-100 rtx-pill--animated" style="animation: rtx-float 3.6s ease-in-out infinite .6s">
+        <div class="card h-100">
             <div class="card-body d-flex align-items-center gap-3">
-                <span class="rtx-gauge" style="width:38px;height:38px; flex:0 0 38px; filter: hue-rotate(25deg)"></span>
+                <span class="rtx-gauge rtx-float" style="width:38px;height:38px; flex:0 0 38px; filter: hue-rotate(25deg); animation-duration:3.4s; animation-delay:.3s"></span>
                 <div>
                     <div class="small text-muted fw-bold" style="letter-spacing:.08em">VTECH EN LÍNEA</div>
                     <div class="fs-4 fw-bold" style="color:var(--rtx-navy)"><span class="rtx-kicker-dot" style="display:inline-block; @(VtechOnline>0?"":"opacity:.25"); background:var(--rtx-honey-deep)"></span> @VtechOnline <span class="text-muted fw-normal" style="font-size:.9rem">/ @VtechTotal</span></div>
@@ -55,14 +57,96 @@
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card h-100 rtx-pill--animated" style="animation: rtx-float 3.6s ease-in-out infinite 1.2s">
+        <div class="card h-100">
             <div class="card-body d-flex align-items-center gap-3">
-                <span class="rtx-gauge" style="width:38px;height:38px; flex:0 0 38px; filter: hue-rotate(140deg)"></span>
+                <span class="rtx-gauge rtx-float" style="width:38px;height:38px; flex:0 0 38px; filter: hue-rotate(140deg); animation-duration:3.6s; animation-delay:.6s"></span>
                 <div>
                     <div class="small text-muted fw-bold" style="letter-spacing:.08em">ÚLTIMA ACTUALIZACIÓN</div>
                     <div class="fw-bold" style="color:var(--rtx-navy)">@(LastUpdate?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "—")</div>
                     <div class="small text-muted">@(LastUpdate.HasValue ? ((DateTime.UtcNow - LastUpdate.Value).TotalMinutes < 5 ? "hace segundos" : $"hace {(int)(DateTime.UtcNow - LastUpdate.Value).TotalMinutes} min") : "sin datos")</div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 g-lg-4 mb-4">
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="fw-bold" style="letter-spacing:.04em">Distribución VTI / VTech</h6>
+                <div class="d-flex align-items-center gap-3 mt-3">
+                    <div class="rtx-donut" style="--vti:@(VtiTotal+ VtechTotal ==0 ? 50 : (int)(100.0*VtiTotal/(VtiTotal+VtechTotal)))%"></div>
+                    <div class="small">
+                        <div><span class="rtx-dot" style="background:var(--rtx-blue)"></span> VTI <strong>@VtiTotal</strong></div>
+                        <div><span class="rtx-dot" style="background:var(--rtx-honey)"></span> VTech <strong>@VtechTotal</strong></div>
+                        <div class="text-muted mt-1">@(VtiTotal+VtechTotal) equipos totales</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="fw-bold" style="letter-spacing:.04em">Equipos por Área</h6>
+                @if (Areas.Count==0) { <div class="text-muted small mt-2">Sin áreas asignadas</div> }
+                else
+                {
+                    @foreach (var a in Areas.Take(5))
+                    {
+                        var c = AreaCounts.GetValueOrDefault(a.Nombre,0);
+                        var pct = MaxArea==0?0:(100*c/MaxArea);
+                        <div class="small d-flex justify-content-between"><span>@a.Nombre</span><span class="text-muted">@c</span></div>
+                        <div class="progress mb-2" style="height:8px"><div class="progress-bar" style="width:@(pct)%; background:var(--rtx-blue)"></div></div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-body d-flex flex-column">
+                <h6 class="fw-bold" style="letter-spacing:.04em">Accesos rápidos</h6>
+                <div class="d-grid gap-2 mt-2">
+                    <a href="/configuration" class="btn btn-primary">⚙ Configuración</a>
+                    <a href="/users" class="btn btn-outline-primary">⧉ Usuarios</a>
+                    <a href="/health" target="_blank" class="btn btn-outline-secondary">↗ Health JSON</a>
+                </div>
+                <div class="mt-3 p-2 bg-light rounded small">
+                    <div class="fw-bold">KPI</div>
+                    <div>Equipos configurados: <strong>@EquiposCount</strong></div>
+                    <div>Tablas VTI/VTech: <strong>@TablasCount</strong></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 g-lg-4 mb-4">
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center"><span>Últimos equipos</span><span class="rtx-pill small">5 recientes</span></div>
+            <div class="table-responsive">
+                <table class="table table-sm small mb-0">
+                    <thead><tr><th>DeviceId</th><th>Nombre</th><th>Área</th><th>Tipo</th><th>Último contacto</th></tr></thead>
+                    <tbody>
+                        @foreach (var e in UltimosEquipos)
+                        {
+                            <tr><td class="font-monospace" style="font-size:.72rem">@e.DeviceId</td><td>@e.Nombre</td><td><span class="badge bg-light text-dark border">@e.Area</span></td><td><span class="rtx-pill @(e.TipoSync==EquipoTipo.VTI?"rtx-pill--sky":"rtx-pill--honey")" style="font-size:.68rem">@e.TipoSync</span></td><td class="text-muted">@(e.UltimoContacto?.ToLocalTime().ToString("MM-dd HH:mm") ?? "—")</td></tr>
+                        }
+                        @if (!UltimosEquipos.Any()) { <tr><td colspan="5" class="text-center text-muted py-2">Sin equipos</td></tr> }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">Actividad reciente</div>
+            <div class="card-body">
+                @if (AuditPreview.Count==0) { <div class="text-muted small">Sin actividad</div> }
+                else { <ul class="list-unstyled small mb-0">@foreach (var a in AuditPreview) { <li class="d-flex gap-2 py-1 border-bottom"><span class="rtx-kicker-dot mt-1" style="flex:0 0 8px"></span><span><strong>@a.Action</strong> @a.EntityName <span class="text-muted">@a.TimestampUtc.ToLocalTime().ToString("HH:mm")</span></span></li> }</ul> }
             </div>
         </div>
     </div>
@@ -87,11 +171,22 @@
     </div>
 </div>
 
+<style>
+.rtx-donut { width:86px;height:86px;border-radius:50%; background: conic-gradient(var(--rtx-blue) 0 calc(var(--vti)*1%), var(--rtx-honey) calc(var(--vti)*1%) 100%); position:relative; box-shadow: inset 0 0 0 12px #fff, 0 4px 12px rgba(0,0,0,.12); }
+.rtx-dot { width:10px;height:10px;border-radius:50%; display:inline-block; vertical-align:middle; margin-right:4px; }
+</style>
+
 @code {
     int VtiTotal, VtechTotal, VtiOnline, VtechOnline;
     DateTime? LastUpdate;
     bool? SqlOk, OdbcOk;
     string? SqlMsg, OdbcMsg;
+    List<EquipoDto> UltimosEquipos = new();
+    List<(string Nombre, int Count)> Areas = new();
+    Dictionary<string,int> AreaCounts = new();
+    int MaxArea = 1;
+    int EquiposCount, TablasCount;
+    List<SXA.RTX.Analytics.Domain.Entities.AuditLog> AuditPreview = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -105,9 +200,32 @@
             VtiOnline = catalog.Count(c => string.Equals(c.TipoMaquina, "VTI", StringComparison.OrdinalIgnoreCase) && c.UltimoContacto.HasValue && c.UltimoContacto.Value > threshold);
             VtechOnline = catalog.Count(c => string.Equals(c.TipoMaquina, "VTech", StringComparison.OrdinalIgnoreCase) && c.UltimoContacto.HasValue && c.UltimoContacto.Value > threshold);
             LastUpdate = catalog.Where(c => c.UltimoContacto.HasValue).MaxBy(c => c.UltimoContacto!.Value)?.UltimoContacto;
+
+            var equipos = await EquipoService.GetEquiposAsync();
+            EquiposCount = equipos.Count;
+            // Merge para últimos
+            var map = catalog.ToDictionary(c=>c.DeviceId, c=>c);
+            var merged = equipos.Select(e => {
+                if(map.TryGetValue(e.DeviceId, out var c)) {
+                    var tipo = c.TipoMaquina?.Equals("VTech", StringComparison.OrdinalIgnoreCase)==true ? EquipoTipo.VTech : c.TipoMaquina?.Equals("VTI", StringComparison.OrdinalIgnoreCase)==true ? EquipoTipo.VTI : (EquipoTipo?)null;
+                    return e with { TipoSync = tipo, UltimoContacto = c.UltimoContacto };
+                }
+                return e;
+            }).OrderByDescending(e=>e.UltimoContacto ?? DateTime.MinValue).Take(5).ToList();
+            UltimosEquipos = merged;
+
+            var grouped = equipos.GroupBy(e=>e.Area).Select(g=> (Nombre:g.Key, Count:g.Count())).OrderByDescending(x=>x.Count).ToList();
+            Areas = grouped.Select(x=> (x.Nombre, x.Count)).ToList();
+            AreaCounts = grouped.ToDictionary(x=>x.Nombre, x=>x.Count);
+            MaxArea = AreaCounts.Values.DefaultIfEmpty(1).Max();
+
+            // Tablas count
+            var cfg = await TablasService.GetConfigAsync();
+            TablasCount = cfg.Count;
         }
         catch { }
         _ = CheckConnections();
+        _ = LoadAudit();
     }
 
     async Task CheckConnections()
@@ -121,5 +239,14 @@
         catch (Exception ex) { SqlOk = false; SqlMsg = ex.Message; }
         try { var (ok, msg) = await SystemService.TestOdbcConnectionAsync("DSN=MAPICS;"); OdbcOk = ok; OdbcMsg = msg; } catch (Exception ex) { OdbcOk = false; OdbcMsg = ex.Message; }
         StateHasChanged();
+    }
+    async Task LoadAudit()
+    {
+        try
+        {
+            // Usa ConfigurationDbContext directo si existe, si no demo vacío
+            // Por ahora muestra vacío en InMemory
+            await Task.CompletedTask;
+        } catch {}
     }
 }
