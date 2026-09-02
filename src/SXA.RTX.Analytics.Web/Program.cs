@@ -86,6 +86,23 @@ app.MapGet("/logout", async (HttpContext ctx) =>
     return Results.Empty;
 });
 
+app.MapPost("/api/auth/login", async (HttpContext ctx, SXA.RTX.Analytics.Application.Abstractions.IAuthService auth, LoginRequest req) =>
+{
+    var res = await auth.LoginAsync(req.Username, req.Password);
+    if (!res.Success || res.User is null) return Results.Json(new { success = false, message = res.Message }, statusCode: 401);
+    var claims = new List<System.Security.Claims.Claim>
+    {
+        new(System.Security.Claims.ClaimTypes.Name, res.User.Username),
+        new(System.Security.Claims.ClaimTypes.NameIdentifier, res.User.Id.ToString()),
+        new(System.Security.Claims.ClaimTypes.Role, res.User.Role.ToString()),
+        new("DisplayName", res.User.DisplayName),
+    };
+    var identity = new System.Security.Claims.ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+    var principal = new System.Security.Claims.ClaimsPrincipal(identity);
+    await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new Microsoft.AspNetCore.Authentication.AuthenticationProperties { IsPersistent = true, ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8) });
+    return Results.Json(new { success = true });
+}).DisableAntiforgery();
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
@@ -115,3 +132,5 @@ app.Lifetime.ApplicationStarted.Register(() => Log.Information("SXA-RTX Analytic
 app.Lifetime.ApplicationStopping.Register(() => Log.Information("SXA-RTX Analytics stopping"));
 
 app.Run();
+
+record LoginRequest(string Username, string Password);

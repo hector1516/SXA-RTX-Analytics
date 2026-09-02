@@ -1,15 +1,10 @@
 @page "/login"
 @layout Components.Layout.LoginLayout
 @rendermode InteractiveServer
-@using System.Security.Claims
-@using Microsoft.AspNetCore.Authentication
-@using Microsoft.AspNetCore.Authentication.Cookies
 @using Microsoft.AspNetCore.Authorization
-@using SXA.RTX.Analytics.Application.Abstractions
 @attribute [AllowAnonymous]
-@inject IAuthService Auth
-@inject IHttpContextAccessor Http
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <PageTitle>Login — SXA-RTX Analytics</PageTitle>
 
@@ -73,26 +68,23 @@
     async Task DoLogin()
     {
         Error = null; OkMsg = null; IsBusy = true;
-        var res = await Auth.LoginAsync(Username.Trim(), Password);
-        if (!res.Success || res.User is null) { Error = res.Message; IsBusy = false; return; }
-
-        var claims = new List<Claim>
+        try
         {
-            new(ClaimTypes.Name, res.User.Username),
-            new(ClaimTypes.NameIdentifier, res.User.Id.ToString()),
-            new(ClaimTypes.Role, res.User.Role.ToString()),
-            new("DisplayName", res.User.DisplayName),
-        };
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        var principal = new ClaimsPrincipal(identity);
-        var ctx = Http.HttpContext;
-        if (ctx is not null)
-        {
-            await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties { IsPersistent = true, ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8) });
-            OkMsg = "Acceso concedido — redirigiendo...";
-            IsBusy = false;
-            Nav.NavigateTo("/", forceLoad: true);
+            var payload = System.Text.Json.JsonSerializer.Serialize(new { Username = Username.Trim(), Password = Password });
+            var js = "await (await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:" + System.Text.Json.JsonSerializer.Serialize(payload) + "})).text()";
+            var json = await JS.InvokeAsync<string>("eval", js);
+            var doc = System.Text.Json.JsonDocument.Parse(json);
+            var success = doc.RootElement.TryGetProperty("success", out var s) && s.GetBoolean();
+            if (success)
+            {
+                OkMsg = "Acceso concedido — redirigiendo...";
+                IsBusy = false;
+                Nav.NavigateTo("/", forceLoad: true);
+                return;
+            }
+            var msg = doc.RootElement.TryGetProperty("message", out var m) ? m.GetString() : "Credenciales inválidas";
+            Error = msg; IsBusy = false;
         }
-        else { Error = "No se pudo crear la sesión (HttpContext nulo). Recarga."; IsBusy = false; }
+        catch (Exception ex) { Error = ex.Message; IsBusy = false; }
     }
 }
