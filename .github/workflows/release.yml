@@ -1,0 +1,42 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versión (ej 1.0.0)"
+        required: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: "10.0.x" }
+      - name: Publish
+        run: |
+          $ver = "${{ inputs.version }}"
+          if (-not $ver) { $ver = "${{ github.ref_name }}".TrimStart("v"); if (-not $ver -or $ver -like "main*") { $ver = "1.0.0" } }
+          echo "Version $ver"
+          .\publish-analytics.ps1 -Version $ver
+      - name: Upload publish
+        uses: actions/upload-artifact@v4
+        with: { name: publish, path: artifacts/publish }
+      - name: Build installer (if Inno installed)
+        run: |
+          choco install innosetup -y
+          $ver = "${{ inputs.version }}"; if (-not $ver) { $ver = "${{ github.ref_name }}".TrimStart("v"); if (-not $ver -or $ver -like "main*") { $ver = "1.0.0" } }
+          iscc /DMyAppVersion=$ver installer/Analytics.iss
+        continue-on-error: true
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with: { name: installer, path: artifacts/pkg/*.exe }
+        continue-on-error: true
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with: { files: "artifacts/pkg/*.exe\nartifacts/publish/**", generate_release_notes: true }

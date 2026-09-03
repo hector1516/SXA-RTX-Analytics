@@ -11,7 +11,7 @@ using SXA.RTX.Analytics.Reporting.Extensions;
 using SXA.RTX.Analytics.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
-
+builder.Host.UseWindowsService();
 builder.Host.UseSerilog((ctx, services, cfg) =>
 {
     cfg.ReadFrom.Configuration(ctx.Configuration)
@@ -48,6 +48,7 @@ builder.Services.AddAuthorization(opts =>
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddReportingEngine();
 
+builder.Services.AddHttpClient();
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ConfigurationDbContext>(name: "configuration_database", failureStatus: HealthStatus.Degraded, tags: ["db", "configuration"])
     .AddCheck("self", () => HealthCheckResult.Healthy("Application is running"), tags: ["live"]);
@@ -78,6 +79,27 @@ app.MapHealthChecks("/health", new HealthCheckOptions
     }
 });
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = r => r.Tags.Contains("live"), ResponseWriter = async (ctx, report) => { ctx.Response.ContentType = "text/plain"; await ctx.Response.WriteAsync(report.Status == HealthStatus.Healthy ? "Healthy" : "Unhealthy"); } });
+
+app.MapGet("/api/version", (IConfiguration cfg) =>
+{
+    var v = typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.0";
+    return Results.Json(new { version = v, exportedAt = DateTime.UtcNow });
+});
+
+app.MapGet("/api/updates/check", async (IConfiguration cfg, HttpClient http) =>
+{
+    try
+    {
+        var current = typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.0";
+        // Usa GitHub Releases como fuente de changelog (público)
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("SXA-RTX-Analytics");
+        var latest = await http.GetFromJsonAsync<GitHubRelease>("https://api.github.com/repos/hector1516/SXA-RTX-Analytics/releases/latest");
+        if (latest is null) return Results.Json(new { current, hasUpdate = false });
+        var hasUpdate = !string.Equals(latest.tag_name?.TrimStart('v'), current, StringComparison.OrdinalIgnoreCase);
+        return Results.Json(new { current, latest = latest.tag_name, hasUpdate, changelog = latest.body, url = latest.html_url });
+    }
+    catch (Exception ex) { return Results.Json(new { error = ex.Message }, statusCode: 500); }
+});
 
 app.MapGet("/logout", async (HttpContext ctx) =>
 {
@@ -134,3 +156,4 @@ app.Lifetime.ApplicationStopping.Register(() => Log.Information("SXA-RTX Analyti
 app.Run();
 
 record LoginRequest(string Username, string Password);
+record GitHubRelease(string tag_name, string body, string html_url);

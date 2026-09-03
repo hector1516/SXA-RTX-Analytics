@@ -1,5 +1,8 @@
 ﻿@inherits LayoutComponentBase
 @inject AuthenticationStateProvider AuthState
+@inject IHttpClientFactory HttpFactory
+@inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <div class="page">
     <div class="sidebar">
@@ -47,10 +50,40 @@
                     <span class="small text-muted d-none d-xl-inline">— SXA-RTX × ECCSA</span>
                 </div>
             </div>
-            <div class="small text-muted mt-2 d-flex gap-2 align-items-center" style="opacity:.7">© ECCSA Automation — Plataforma interna SXA-RTX Analytics. Uso confidencial. <a href="/health" target="_blank" class="text-muted" style="font-size:.62rem; opacity:.45; text-decoration:none">· health</a></div>
+            <div class="small text-muted mt-2 d-flex gap-2 align-items-center flex-wrap" style="opacity:.7">© ECCSA Automation — Plataforma interna SXA-RTX Analytics. Uso confidencial. <span class="vr" style="height:12px"></span> <span style="font-size:.62rem">v@(Version)</span> <a href="/health" target="_blank" class="text-muted" style="font-size:.62rem; opacity:.45; text-decoration:none">· health</a></div>
         </footer>
     </main>
 </div>
+
+@if (ShowUpdateAdmin)
+{
+    <div class="modal d-block" style="background:rgba(0,0,0,.45); position:fixed; inset:0; z-index:1050; display:grid; place-items:center">
+        <div class="card" style="max-width:560px; width:90%">
+            <div class="card-body">
+                <h5 class="fw-bold">Actualización disponible — v@(LatestVersion)</h5>
+                <p class="small text-muted">Versión actual v@(Version). Hay una nueva versión con cambios:</p>
+                <pre class="small bg-light border rounded p-2" style="max-height:220px; overflow:auto; white-space:pre-wrap">@Changelog</pre>
+                <div class="d-flex gap-2 justify-content-end">
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => ShowUpdateAdmin=false">Recordar más tarde</button>
+                    <a href="@UpdateUrl" target="_blank" class="btn btn-primary btn-sm">Ver release</a>
+                    <a href="@UpdateUrl" target="_blank" class="btn btn-success btn-sm" @onclick="() => ShowUpdateAdmin=false">Actualizar</a>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+@if (ShowChangelogAll)
+{
+    <div class="modal d-block" style="background:rgba(0,0,0,.45); position:fixed; inset:0; z-index:1050; display:grid; place-items:center">
+        <div class="card" style="max-width:560px; width:90%">
+            <div class="card-body">
+                <h5 class="fw-bold">Novedades v@(LatestVersion)</h5>
+                <pre class="small bg-light border rounded p-2" style="max-height:220px; overflow:auto; white-space:pre-wrap">@Changelog</pre>
+                <div class="d-flex justify-content-end"><button class="btn btn-primary btn-sm" @onclick="DismissChangelog">Entendido</button></div>
+            </div>
+        </div>
+    </div>
+}
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
@@ -62,4 +95,61 @@
     string Initial(string? name) => string.IsNullOrEmpty(name) ? "?" : name.Substring(0,1).ToUpperInvariant();
     bool IsAdmin(AuthenticationState s) => s.User.IsInRole("Administrador");
     string Role(AuthenticationState s) => s.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
+
+    string Version = "1.0.0";
+    string? LatestVersion, Changelog, UpdateUrl;
+    bool ShowUpdateAdmin, ShowChangelogAll;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            var http = HttpFactory.CreateClient();
+            http.BaseAddress = new Uri(Nav.BaseUri);
+            // Versión actual
+            try { var v = await http.GetFromJsonAsync<VersionInfo>("/api/version"); if (v!=null) Version = v.version; } catch {}
+            // Check updates
+            var auth = await AuthState.GetAuthenticationStateAsync();
+            var isAdmin = auth.User.IsInRole("Administrador");
+            var upd = await http.GetFromJsonAsync<UpdateInfo>("/api/updates/check");
+            if (upd != null && !string.IsNullOrEmpty(upd.latest) && upd.hasUpdate)
+            {
+                LatestVersion = upd.latest; Changelog = upd.changelog; UpdateUrl = upd.url;
+                if (isAdmin)
+                {
+                    ShowUpdateAdmin = true;
+                    StateHasChanged();
+                }
+                else
+                {
+                    // Para todos: si hay nueva versión y no la han visto, mostrar changelog
+                    var lastSeen = await JS.InvokeAsync<string>("eval", "localStorage.getItem('sxa_lastSeenVersion') || ''");
+                    if (lastSeen != LatestVersion)
+                    {
+                        ShowChangelogAll = true;
+                        StateHasChanged();
+                    }
+                }
+            }
+            else if (upd != null && !upd.hasUpdate && !string.IsNullOrEmpty(upd.latest))
+            {
+                // Sin update, pero si el usuario no ha visto el changelog de la versión actual, mostrarlo una vez
+                var lastSeen = await JS.InvokeAsync<string>("eval", "localStorage.getItem('sxa_lastSeenVersion') || ''");
+                if (lastSeen != Version && !string.IsNullOrEmpty(Version))
+                {
+                    // No mostrar a menos que sea nueva instalación con changelog
+                }
+            }
+        }
+        catch {}
+    }
+    async Task DismissChangelog()
+    {
+        ShowChangelogAll = false;
+        if (!string.IsNullOrEmpty(LatestVersion))
+            await JS.InvokeVoidAsync("eval", $"localStorage.setItem('sxa_lastSeenVersion','{LatestVersion}')");
+    }
+    record VersionInfo(string version);
+    record UpdateInfo(string current, string latest, bool hasUpdate, string changelog, string url);
 }
