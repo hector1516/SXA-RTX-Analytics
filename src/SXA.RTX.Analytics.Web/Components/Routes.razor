@@ -1,14 +1,9 @@
-﻿<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+﻿@using SXA.RTX.Analytics.Web.Components.Pages
+<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
             <NotAuthorized>
-                <LayoutView Layout="typeof(Layout.MainLayout)">
-                    <div class="text-center py-5">
-                        <h4>Acceso requerido</h4>
-                        <p class="text-muted">Inicia sesión para continuar.</p>
-                        <a href="/login" class="btn btn-primary">Ir a login</a>
-                    </div>
-                </LayoutView>
+                <RedirectToLogin />
             </NotAuthorized>
         </AuthorizeRouteView>
         <FocusOnNavigate RouteData="routeData" Selector="h1" />

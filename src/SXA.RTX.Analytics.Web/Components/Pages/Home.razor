@@ -1,5 +1,7 @@
 ﻿@page "/"
 @rendermode InteractiveServer
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
 @using SXA.RTX.Analytics.Application.Abstractions
 @using SXA.RTX.Analytics.Domain.Enums
 @inject IEquipoService EquipoService
