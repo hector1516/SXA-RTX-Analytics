@@ -62,7 +62,7 @@
             <div class="card-body">
                 <h5 class="fw-bold">Actualización disponible — v@(LatestVersion)</h5>
                 <p class="small text-muted">Versión actual v@(Version). Hay una nueva versión con cambios:</p>
-                <pre class="small bg-light border rounded p-2" style="max-height:220px; overflow:auto; white-space:pre-wrap">@Changelog</pre>
+                <pre class="small bg-light border rounded p-2" style="max-height:220px; overflow:auto; white-space:pre-wrap">@PrettyChangelog(Changelog)</pre>
                 <div class="d-flex gap-2 justify-content-end">
                     <button class="btn btn-outline-secondary btn-sm" @onclick="() => ShowUpdateAdmin=false">Recordar más tarde</button>
                     <a href="@UpdateUrl" target="_blank" class="btn btn-primary btn-sm">Ver release</a>
@@ -78,7 +78,7 @@
         <div class="card" style="max-width:560px; width:90%">
             <div class="card-body">
                 <h5 class="fw-bold">Novedades v@(LatestVersion)</h5>
-                <pre class="small bg-light border rounded p-2" style="max-height:220px; overflow:auto; white-space:pre-wrap">@Changelog</pre>
+                <pre class="small bg-light border rounded p-2" style="max-height:220px; overflow:auto; white-space:pre-wrap">@PrettyChangelog(Changelog)</pre>
                 <div class="d-flex justify-content-end"><button class="btn btn-primary btn-sm" @onclick="DismissChangelog">Entendido</button></div>
             </div>
         </div>
@@ -96,6 +96,38 @@
     bool IsAdmin(AuthenticationState s) => s.User.IsInRole("Administrador");
     string Role(AuthenticationState s) => s.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
 
+    // Convierte el markdown del release (titulos, tablas, negritas, codigo) a texto plano legible.
+    string PrettyChangelog(string? md)
+    {
+        if (string.IsNullOrWhiteSpace(md)) return string.Empty;
+        var outp = new System.Text.StringBuilder();
+        foreach (var raw in md.Replace("\r\n", "\n").Split('\n'))
+        {
+            var line = raw.TrimEnd();
+            if (string.IsNullOrWhiteSpace(line)) { outp.Append('\n'); continue; }
+            if (line.TrimStart().StartsWith("---") || line.Trim() == "|") continue;   // separadores
+            if (line.TrimStart().StartsWith("|"))                                        // tabla -> lista
+            {
+                var cells = line.Trim().Trim('|').Split('|')
+                              .Select(c => Clean(c)).Where(c => c.Length > 0).ToArray();
+                if (cells.Length == 0) continue;
+                if (cells.All(c => c.All(ch => ch is '-' or ':' or ' '))) continue;       // fila separadora
+                outp.Append("  • ").AppendLine(string.Join("  —  ", cells));
+                continue;
+            }
+            outp.AppendLine(Clean(line));
+        }
+        return outp.ToString().Trim();
+
+        static string Clean(string s)
+        {
+            s = s.Trim();
+            while (s.StartsWith("#")) s = s.TrimStart('#').Trim();
+            s = s.Replace("**", "").Replace("`", "").Replace("  ", " ");
+            return s.Trim();
+        }
+    }
+
     string Version = "1.0.0";
     string? LatestVersion, Changelog, UpdateUrl;
     bool ShowUpdateAdmin, ShowChangelogAll;
@@ -108,14 +140,14 @@
             var http = HttpFactory.CreateClient();
             http.BaseAddress = new Uri(Nav.BaseUri);
             // Versión actual
-            try { var v = await http.GetFromJsonAsync<VersionInfo>("/api/version"); if (v!=null) Version = v.version; } catch {}
+            try { var v = await http.GetFromJsonAsync<VersionInfo>("/api/version"); if (v!=null && !string.IsNullOrEmpty(v.version)) Version = v.version; } catch {}
             // Check updates
             var auth = await AuthState.GetAuthenticationStateAsync();
             var isAdmin = auth.User.IsInRole("Administrador");
             var upd = await http.GetFromJsonAsync<UpdateInfo>("/api/updates/check");
             if (upd != null && !string.IsNullOrEmpty(upd.latest) && upd.hasUpdate)
             {
-                LatestVersion = upd.latest; Changelog = upd.changelog; UpdateUrl = upd.url;
+                LatestVersion = upd.latest?.TrimStart('v', 'V'); Changelog = upd.changelog; UpdateUrl = upd.url;
                 if (isAdmin)
                 {
                     ShowUpdateAdmin = true;
@@ -142,7 +174,9 @@
                 }
             }
         }
-        catch {}
+        catch { }
+        // La versión del footer y cualquier modal se pintan siempre
+        StateHasChanged();
     }
     async Task DismissChangelog()
     {

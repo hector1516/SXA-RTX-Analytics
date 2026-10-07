@@ -1,4 +1,7 @@
 ﻿@using SXA.RTX.Analytics.Web.Components.Pages
+@* Todo el arbol de rutas es interactivo (el modo se declara en App.razor sobre
+   <Routes>). Asi MainLayout tambien ejecuta OnAfterRenderAsync y puede mostrar
+   la version real del footer, el popup de actualizacion y el changelog. *@
 <Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">

@@ -15,7 +15,9 @@
 </head>
 
 <body>
-    <Routes />
+    @* Modo interactivo a nivel de Routes: cubre tambien MainLayout, que de otro
+       modo se renderiza estatico y su OnAfterRenderAsync nunca se ejecuta. *@
+    <Routes @rendermode="InteractiveServer" />
 
     <!-- Toast discreto de reconexión (antes barra inferior) -->
     <div id="components-reconnect-modal" class="components-reconnect-hide">

@@ -80,6 +80,21 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 });
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = r => r.Tags.Contains("live"), ResponseWriter = async (ctx, report) => { ctx.Response.ContentType = "text/plain"; await ctx.Response.WriteAsync(report.Status == HealthStatus.Healthy ? "Healthy" : "Unhealthy"); } });
 
+// Normaliza "v1.1.1", "1.1.1", "1.1.1.0" y "1.1.1.0-beta" a una forma comparable.
+static string NormalizeVersion(string? raw)
+{
+    if (string.IsNullOrWhiteSpace(raw)) return "0.0.0";
+    var s = raw.Trim().TrimStart('v', 'V');
+    var dash = s.IndexOfAny(new[] { '-', '+' });
+    if (dash >= 0) s = s[..dash];
+    var parts = s.Split('.', StringSplitOptions.RemoveEmptyEntries)
+                 .Select(p => int.TryParse(p, out var n) ? n : 0)
+                 .Take(4)
+                 .ToList();
+    while (parts.Count < 3) parts.Add(0);
+    return string.Join('.', parts);
+}
+
 app.MapGet("/api/version", (IConfiguration cfg) =>
 {
     var v = typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.0";
@@ -95,7 +110,10 @@ app.MapGet("/api/updates/check", async (IConfiguration cfg, HttpClient http) =>
         http.DefaultRequestHeaders.UserAgent.ParseAdd("SXA-RTX-Analytics");
         var latest = await http.GetFromJsonAsync<GitHubRelease>("https://api.github.com/repos/hector1516/SXA-RTX-Analytics/releases/latest");
         if (latest is null) return Results.Json(new { current, hasUpdate = false });
-        var hasUpdate = !string.Equals(latest.tag_name?.TrimStart('v'), current, StringComparison.OrdinalIgnoreCase);
+        var hasUpdate = System.Version.TryParse(NormalizeVersion(current), out var cur)
+                     && System.Version.TryParse(NormalizeVersion(latest.tag_name), out var lat)
+                        ? cur < lat
+                        : !string.Equals(NormalizeVersion(latest.tag_name), NormalizeVersion(current), StringComparison.OrdinalIgnoreCase);
         return Results.Json(new { current, latest = latest.tag_name, hasUpdate, changelog = latest.body, url = latest.html_url });
     }
     catch (Exception ex) { return Results.Json(new { error = ex.Message }, statusCode: 500); }
