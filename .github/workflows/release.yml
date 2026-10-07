@@ -3,40 +3,98 @@ name: release
 on:
   push:
     tags: ["v*"]
-    branches: [main]
   workflow_dispatch:
     inputs:
       version:
-        description: "Versión (ej 1.0.0)"
+        description: "Version (ej 1.1.1). Vacio = usar el tag."
         required: false
+        default: ""
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-dotnet@v4
-        with: { dotnet-version: "10.0.x" }
-      - name: Publish
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Resolver version
+        id: ver
+        shell: pwsh
         run: |
-          $ver = "${{ inputs.version }}"
-          if (-not $ver) { $ver = "${{ github.ref_name }}".TrimStart("v"); if (-not $ver -or $ver -like "main*") { $ver = "1.0.0" } }
-          echo "Version $ver"
-          .\publish-analytics.ps1 -Version $ver
+          $v = "${{ inputs.version }}".Trim()
+          if (-not $v) { $v = "${{ github.ref_name }}".Trim() }
+          if ($v.StartsWith("v")) { $v = $v.Substring(1) }
+          if (-not $v) { $v = "0.0.0" }
+          if ($v -notmatch '^\d+\.\d+\.\d+') { throw "Version invalida: '$v'" }
+          "value=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Write-Host "Version: $v"
+
+      - name: Build y test
+        shell: pwsh
+        run: |
+          dotnet build SXA.RTX.Analytics.sln -c Release
+          if ($LASTEXITCODE -ne 0) { throw "dotnet build fallo" }
+          dotnet test SXA.RTX.Analytics.sln -c Release --no-build
+          if ($LASTEXITCODE -ne 0) { throw "dotnet test fallo" }
+
+      - name: Instalar Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress --limit-output
+
+      - name: Publish + instalador
+        shell: pwsh
+        run: .\publish-analytics.ps1 -Version "${{ steps.ver.outputs.value }}"
+
+      - name: Comprimir publish
+        shell: pwsh
+        run: |
+          $v = "${{ steps.ver.outputs.value }}"
+          Compress-Archive -Path artifacts\publish\* -DestinationPath "artifacts\pkg\SXA-RTX-Analytics-v$v-publish.zip" -Force
+          Get-ChildItem artifacts\pkg | Select-Object Name, Length | Format-Table -AutoSize
+
       - name: Upload publish
         uses: actions/upload-artifact@v4
-        with: { name: publish, path: artifacts/publish }
-      - name: Build installer (if Inno installed)
-        run: |
-          choco install innosetup -y
-          $ver = "${{ inputs.version }}"; if (-not $ver) { $ver = "${{ github.ref_name }}".TrimStart("v"); if (-not $ver -or $ver -like "main*") { $ver = "1.0.0" } }
-          iscc /DMyAppVersion=$ver installer/Analytics.iss
-        continue-on-error: true
+        with:
+          name: publish
+          path: artifacts/publish
+          retention-days: 14
+
       - name: Upload installer
         uses: actions/upload-artifact@v4
-        with: { name: installer, path: artifacts/pkg/*.exe }
-        continue-on-error: true
+        with:
+          name: installer
+          path: artifacts/pkg/*
+          retention-days: 14
+
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
-        with: { files: "artifacts/pkg/*.exe\nartifacts/publish/**", generate_release_notes: true }
+        with:
+          name: SXA-RTX Analytics ${{ steps.ver.outputs.value }}
+          tag_name: ${{ github.ref_name }}
+          files: |
+            artifacts/pkg/*.exe
+            artifacts/pkg/*.zip
+          fail_on_unmatched_files: false
+          generate_release_notes: true
+          body: |
+            ## SXA-RTX Analytics ${{ steps.ver.outputs.value }}
+
+            | Artefacto | Descripcion |
+            | --- | --- |
+            | `Setup_SXA_RTX_Analytics_v${{ steps.ver.outputs.value }}.exe` | Instalador (detecta IIS o instala Windows Service) |
+            | `SXA-RTX-Analytics-v${{ steps.ver.outputs.value }}-publish.zip` | Publicacion para `dotnet publish` manual en IIS |
+
+            ### Requisitos servidor
+            - Windows Server 2019+ / Windows 10-11 (IIS)
+            - ASP.NET Core Hosting Bundle 10.0 (instalador de Microsoft)
+            - SQL Server con base de configuracion `SXA_RTX_Analytics`
+
+            La cadena de conexion se configura con `/configuration` o con la variable
+            de entorno `ConnectionStrings__ConfigurationDatabase` en el App Pool.
