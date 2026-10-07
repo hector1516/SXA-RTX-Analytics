@@ -2,6 +2,7 @@ using System.Data;
 using System.Diagnostics;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
+using SXA.RTX.Analytics.Infrastructure.Persistence;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -26,7 +27,7 @@ public sealed class DynamicQueryService : IDynamicQueryService
             var parts = tableName.Replace("[","").Replace("]","").Split('.');
             var schema = parts.Length==2?parts[0]:"dbo";
             var table = parts.Length==2?parts[1]:parts[0];
-            using var conn = new SqlConnection(connectionString);
+            using var conn = SqlProbe.Create(connectionString);
             await conn.OpenAsync(ct);
             using var cmd = new SqlCommand("SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@s AND TABLE_NAME=@t ORDER BY ORDINAL_POSITION", conn);
             cmd.Parameters.AddWithValue("@s", schema);
@@ -72,14 +73,12 @@ public sealed class DynamicQueryService : IDynamicQueryService
             }
             else if (!string.IsNullOrWhiteSpace(request.Tipo) || !string.IsNullOrWhiteSpace(request.Area))
             {
-                // Filtra por subquery en SXA_RTX_Equipos si existe, si no fallback a OrigenPC like
-                // Simplificado: si Tipo/Area, filtra OrigenPC IN (SELECT DeviceId FROM SXA_RTX_Equipos WHERE ...)
-                // Si SXA_RTX_Equipos no existe en la BD operacional, ignoramos
-                sql += " AND [OrigenPC] IN (SELECT DeviceId FROM [SXA_RTX_Analytics].dbo.SXA_RTX_Equipos WHERE 1=1";
+                // Filtra contra la tabla de equipos de la MISMA base de configuracion
+                // (SXA_RTX_Equipos: DeviceId, Area y Tipo). Tipo viene de SXA_PCs.TipoMaquina.
+                sql += " AND [OrigenPC] IN (SELECT DeviceId FROM [dbo].[SXA_RTX_Equipos] WHERE 1=1";
                 if (!string.IsNullOrWhiteSpace(request.Tipo)) { sql += " AND Tipo=@tipo"; parameters.Add(new SqlParameter("@tipo", request.Tipo=="VTI"?1:2)); }
                 if (!string.IsNullOrWhiteSpace(request.Area)) { sql += " AND Area=@area"; parameters.Add(new SqlParameter("@area", request.Area)); }
                 sql += ")";
-                // Si la BD operacional no tiene SXA_RTX_Analytics, esta subquery fallará; capturamos y fallback
             }
 
             if (request.From.HasValue && !string.IsNullOrWhiteSpace(request.DateColumn))

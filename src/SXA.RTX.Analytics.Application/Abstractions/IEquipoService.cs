@@ -23,7 +23,7 @@ public interface IEquipoService
 {
     Task<IReadOnlyList<CatalogDeviceDto>> GetCatalogAsync(string? sqlConnectionString, CancellationToken ct = default);
     Task<IReadOnlyList<EquipoDto>> GetEquiposAsync(CancellationToken ct = default);
-    Task<(bool Success, string Message)> UpsertAsync(string deviceId, string nombre, string area, CancellationToken ct = default);
+    Task<(bool Success, string Message)> UpsertAsync(string deviceId, string nombre, string area, string? tipoMaquina = null, CancellationToken ct = default);
 }
 
 public interface ITablasConfigService

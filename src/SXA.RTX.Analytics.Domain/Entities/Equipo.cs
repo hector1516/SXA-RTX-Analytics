@@ -11,6 +11,7 @@ public sealed class Equipo : BaseEntity
     public required string DeviceId { get; set; } // PC-XXXXXXXXXXXXXXXX, UNIQUE
     public required string Nombre { get; set; }   // asignado en Analytics
     public required string Area { get; set; }
+    public int Tipo { get; set; }                // 1=VTI 2=VTech,copiado de SXA_PCs.TipoMaquina
     public string? Descripcion { get; set; }
     public bool IsActive { get; set; } = true;
 }

@@ -21,7 +21,7 @@ public sealed class EquipoService : IEquipoService
         {
             try
             {
-                using var conn = new SqlConnection(sqlConnectionString);
+                using var conn = SqlProbe.Create(sqlConnectionString);
                 await conn.OpenAsync(ct);
                 // Intentar leer SXA_PCs; si no existe, cae a fallback
                 using var cmd = new SqlCommand("SELECT DeviceId, NombrePC, TipoMaquina, Modelo, UltimoContacto FROM dbo.SXA_PCs ORDER BY UltimoContacto DESC", conn);
@@ -50,19 +50,27 @@ public sealed class EquipoService : IEquipoService
         return equipos.Select(e => new EquipoDto(e.Id, e.DeviceId, e.Nombre, e.Area, null, null, null, e.IsActive)).ToList();
     }
 
-    public async Task<(bool Success, string Message)> UpsertAsync(string deviceId, string nombre, string area, CancellationToken ct = default)
+    public async Task<(bool Success, string Message)> UpsertAsync(string deviceId, string nombre, string area, string? tipoMaquina = null, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(deviceId) || string.IsNullOrWhiteSpace(nombre) || string.IsNullOrWhiteSpace(area))
             return (false, "DeviceId, Nombre y Área son obligatorios.");
         var existing = await _db.Set<Equipo>().FirstOrDefaultAsync(x => x.DeviceId == deviceId, ct);
+        // Tipo viene de SXA_PCs.TipoMaquina: 1=VTI, 2=VTech, 0=desconocido.
+        var tipo = (tipoMaquina ?? "").Trim().ToUpperInvariant() switch
+        {
+            "VTI" => 1,
+            "VTECH" => 2,
+            _ => 0,
+        };
         if (existing is null)
         {
-            _db.Set<Equipo>().Add(new Equipo { DeviceId = deviceId.Trim(), Nombre = nombre.Trim(), Area = area.Trim() });
+            _db.Set<Equipo>().Add(new Equipo { DeviceId = deviceId.Trim(), Nombre = nombre.Trim(), Area = area.Trim(), Tipo = tipo });
         }
         else
         {
             existing.Nombre = nombre.Trim();
             existing.Area = area.Trim();
+            if (tipo != 0) existing.Tipo = tipo;
             existing.UpdatedAtUtc = DateTime.UtcNow;
         }
         await _db.SaveChangesAsync(ct);
@@ -82,7 +90,7 @@ public sealed class TablasConfigService : ITablasConfigService
         {
             try
             {
-                using var conn = new SqlConnection(sqlConnectionString);
+                using var conn = SqlProbe.Create(sqlConnectionString);
                 await conn.OpenAsync(ct);
                 using var cmd = new SqlCommand("SELECT QUOTENAME(TABLE_SCHEMA)+'.'+QUOTENAME(TABLE_NAME) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA='dbo' ORDER BY TABLE_NAME", conn);
                 using var r = await cmd.ExecuteReaderAsync(ct);

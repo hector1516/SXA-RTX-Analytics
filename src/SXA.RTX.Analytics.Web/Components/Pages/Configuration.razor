@@ -229,26 +229,29 @@ else if (ActiveTab == 5)
     async Task TestSql(){ IsTestingSql=true; SqlTestMsg=null; var (ok,msg)=await SystemService.TestSqlConnectionAsync(BuildSqlConnectionStringReal()); SqlTestOk=ok; SqlTestMsg=msg; IsTestingSql=false; }
     async Task LoadDatabases(){ var list=await SystemService.ListDatabasesAsync(BuildSqlConnectionStringReal()); Databases=list.Select(n=>new DatabaseOptionMutable{Name=n}).ToList(); }
     async Task TestOdbc(){ IsTestingOdbc=true; OdbcTestMsg=null; var (ok,msg)=await SystemService.TestOdbcConnectionAsync(OdbcConnectionString); OdbcTestOk=ok; OdbcTestMsg=msg; IsTestingOdbc=false; }
-    async Task LoadTables(){ IsLoadingTables=true; Tables=(await SystemService.GetSystemTablesStatusAsync()).ToList(); IsLoadingTables=false; }
+    async Task LoadTables(){ IsLoadingTables=true; try { Tables=(await SystemService.GetSystemTablesStatusAsync()).ToList(); } finally { IsLoadingTables=false; } }
     async Task CreateOne(string t){ Creating.Add(t); var (ok,msg)=await SystemService.CreateTableAsync(t); TableOk=ok; TableMsg=msg; Creating.Remove(t); await LoadTables(); }
     async Task CreateAll(){ IsCreatingAll=true; var (ok,msg)=await SystemService.CreateAllMissingAsync(); TableOk=ok; TableMsg=msg; IsCreatingAll=false; await LoadTables(); }
 
     async Task LoadEquipos(){
         IsLoadingEquipos=true;
+        try
+        {
         var cs = BuildSqlConnectionStringReal();
         Catalog = (await EquipoService.GetCatalogAsync(cs)).ToList();
         Equipos = (await EquipoService.GetEquiposAsync()).ToList();
         // Merge Tipo from catalog
-        var map = Catalog.ToDictionary(c=>c.DeviceId, c=>c);
+        var map = Catalog.GroupBy(c=>c.DeviceId).ToDictionary(g=>g.Key, g=>g.First());
         for(int i=0;i<Equipos.Count;i++){ var e=Equipos[i]; if(map.TryGetValue(e.DeviceId, out var c)){ var tipo = c.TipoMaquina?.Equals("VTech", StringComparison.OrdinalIgnoreCase)==true ? EquipoTipo.VTech : c.TipoMaquina?.Equals("VTI", StringComparison.OrdinalIgnoreCase)==true ? EquipoTipo.VTI : (EquipoTipo?)null; Equipos[i]= e with{ TipoSync=tipo, NombrePCSync=c.NombrePC, UltimoContacto=c.UltimoContacto }; } }
-        IsLoadingEquipos=false;
+        }
+        finally { IsLoadingEquipos=false; }
     }
-    async Task SaveEquipo(){ IsSavingEquipo=true; EqMsg=null; var (ok,msg)=await EquipoService.UpsertAsync(EqDeviceId, EqNombre, EqArea); EqOk=ok; EqMsg=msg; IsSavingEquipo=false; if(ok) await LoadEquipos(); }
+    async Task SaveEquipo(){ IsSavingEquipo=true; EqMsg=null; var tipo = Catalog.FirstOrDefault(x=>x.DeviceId==EqDeviceId)?.TipoMaquina; var (ok,msg)=await EquipoService.UpsertAsync(EqDeviceId, EqNombre, EqArea, tipo); EqOk=ok; EqMsg=msg; IsSavingEquipo=false; if(ok) await LoadEquipos(); }
     int GetCount(string tipo, bool conNombre){ var set = Equipos.Where(e=> (e.TipoSync?.ToString()??"")==tipo).Select(e=>e.DeviceId).ToHashSet(); var cat = Catalog.Where(c=> (c.TipoMaquina??"")==tipo).Select(c=>c.DeviceId).ToHashSet(); return conNombre ? set.Count : cat.Except(set).Count(); }
     IEnumerable<EquipoDto> GetEquiposByTipo(string tipo, bool conNombre){ var filtered = Equipos.Where(e=> (e.TipoSync?.ToString()??"")==tipo); return conNombre ? filtered : Enumerable.Empty<EquipoDto>(); }
     IEnumerable<CatalogDeviceDto> GetCatalogByTipo(string tipo, bool _con){ var eqSet = Equipos.Select(e=>e.DeviceId).ToHashSet(); return Catalog.Where(c=> (c.TipoMaquina??"")==tipo && !eqSet.Contains(c.DeviceId)); }
 
-    async Task LoadTablas(){ IsLoadingTablas=true; AllTables=(await TablasService.ListAllTablesAsync(BuildSqlConnectionStringReal())).ToList(); var cfg=await TablasService.GetConfigAsync(); Selected=new HashSet<(string, EquipoTipo)>(cfg.Select(x=>(x.TableName, x.Tipo))); IsLoadingTablas=false; }
+    async Task LoadTablas(){ IsLoadingTablas=true; try { AllTables=(await TablasService.ListAllTablesAsync(BuildSqlConnectionStringReal())).ToList(); var cfg=await TablasService.GetConfigAsync(); Selected=new HashSet<(string, EquipoTipo)>(cfg.Select(x=>(x.TableName, x.Tipo))); } finally { IsLoadingTablas=false; } }
     bool IsTableSelected(string t, EquipoTipo tipo)=> Selected.Contains((t,tipo));
     void ToggleTabla(string t, EquipoTipo tipo, bool isChecked){ if(isChecked) Selected.Add((t,tipo)); else Selected.Remove((t,tipo)); }
     int SelectedCount(EquipoTipo tipo)=> Selected.Count(x=>x.Item2==tipo);

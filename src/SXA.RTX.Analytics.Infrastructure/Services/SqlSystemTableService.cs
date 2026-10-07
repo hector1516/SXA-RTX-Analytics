@@ -197,7 +197,7 @@ CREATE TABLE dbo.SXA_RTX_DataSources(
         // Evitar loguear password
         try
         {
-            using var conn = new SqlConnection(connectionString);
+            using var conn = SqlProbe.Create(connectionString);
             await conn.OpenAsync(ct);
             using var cmd = new SqlCommand("SELECT 1", conn);
             await cmd.ExecuteScalarAsync(ct);
@@ -215,7 +215,7 @@ CREATE TABLE dbo.SXA_RTX_DataSources(
         if (string.IsNullOrWhiteSpace(connectionString)) return list;
         try
         {
-            using var conn = new SqlConnection(connectionString);
+            using var conn = SqlProbe.Create(connectionString);
             await conn.OpenAsync(ct);
             using var cmd = new SqlCommand("SELECT name FROM sys.databases WHERE name NOT IN ('master','tempdb','model','msdb') ORDER BY name", conn);
             using var r = await cmd.ExecuteReaderAsync(ct);
