@@ -409,15 +409,12 @@ $header.Font.Italic = 1
 $header.ParagraphFormat.Alignment = 2
 
 # ------------------------------------------------------------ guardar -------
+# El informe se entrega en Word (.docx), que es el formato editable nativo del
+# entorno de destino (Windows Server + Word). Si algun dia hace falta ODT, este
+# mismo script puede guardarlo con SaveAs(..., 23) sin tocar nada mas.
 Write-Host "Guardando DOCX..."
 $docx = "$Base.docx"
 $doc.SaveAs([ref]$docx, [ref]16)      # wdFormatDocumentDefault
-Write-Host "Guardando ODT..."
-$odt = "$Base.odt"
-$doc.SaveAs([ref]$odt, [ref]23)        # wdFormatOpenDocumentText
-Write-Host "Exportando PDF..."
-$pdf = "$Base.pdf"
-$doc.ExportAsFixedFormat($pdf, 17)     # wdExportFormatPDF
 
 $pages = $doc.ComputeStatistics(2)      # wdStatisticPages
 $doc.Close(0)
@@ -426,13 +423,10 @@ $word.Quit()
 [GC]::Collect()
 
 Write-Host ""
-Write-Host "Documentos generados:"
-foreach ($f in @($docx, $odt, $pdf)) {
-  if (Test-Path $f) {
-    $kb = [math]::Round((Get-Item $f).Length / 1KB, 1)
-    Write-Host ("  {0}  ({1} KB)" -f (Split-Path $f -Leaf), $kb)
-  } else {
-    Write-Host ("  FALLO: {0}" -f $f)
-  }
+if (Test-Path $docx) {
+  $kb = [math]::Round((Get-Item $docx).Length / 1KB, 1)
+  Write-Host ("  {0}  ({1} KB)  -  {2} paginas" -f (Split-Path $docx -Leaf), $kb, $pages)
+} else {
+  Write-Host ("  FALLO: no se genero {0}" -f $docx)
+  exit 1
 }
-Write-Host "Paginas: $pages"

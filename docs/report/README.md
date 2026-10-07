@@ -3,25 +3,31 @@
 Esta carpeta contiene el informe funcional y de despliegue de la plataforma,
 con capturas reales de la aplicación.
 
-## Archivos generados
+## Archivo generado
 
 | Archivo | Descripción |
 | --- | --- |
-| `SXA-RTX-Analytics-Informe-v<VERSION>.pdf` | Informe final de solo lectura (19 páginas) |
-| `SXA-RTX-Analytics-Informe-v<VERSION>.docx` | Word editable |
-| `SXA-RTX-Analytics-Informe-v<VERSION>.odt` | OpenDocument / LibreOffice editable |
-| `build-report.ps1` | Script que genera los tres formatos con Word |
+| `SXA-RTX-Analytics-Informe-v<VERSION>.docx` | Informe en Word, editable (20 páginas) |
+| `build-report.ps1` | Script que lo genera |
 | `screens/` | Capturas usadas en el informe |
+
+Se entrega **solo en Word**. Si alguna vez hace falta OpenDocument o PDF, el
+mismo script puede añadirlos sin tocar nada más:
+
+```powershell
+$doc.SaveAs([ref]"$Base.odt", [ref]23)             # OpenDocument
+$doc.ExportAsFixedFormat("$Base.pdf", 17)          # PDF
+```
 
 ## Regenerar el informe
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File docs\report\build-report.ps1 -Version 1.1.2
+powershell -NoProfile -ExecutionPolicy Bypass -File docs\report\build-report.ps1 -Version 1.1.3
 ```
 
-Requiere Microsoft Word instalado. El script escribe DOCX, ODT y PDF a partir
-de las imágenes de `screens/`, así que solo hay que reemplazar las capturas para
-refrescar el contenido.
+Requiere Microsoft Word instalado (se usa como motor de composición). El script
+arma el documento a partir de las imágenes de `screens/`, así que solo hay que
+reemplazar las capturas para refrescar el contenido.
 
 ## Regenerar las capturas
 
