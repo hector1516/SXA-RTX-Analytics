@@ -32,6 +32,9 @@ public static class ServiceCollectionExtensions
                 }));
         }
 
+        services.AddSingleton<SecretProtector>();
+        services.AddScoped<IConfigurationService, ApplicationSettingService>();
+        services.AddScoped<IDataSourceService, DataSourceService>();
         services.AddScoped<ISystemTableService, SqlSystemTableService>();
         services.AddScoped<IEquipoService, EquipoService>();
         services.AddScoped<ITablasConfigService, TablasConfigService>();

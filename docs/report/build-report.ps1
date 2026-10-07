@@ -152,11 +152,13 @@ P "Estado actual: funcionalidad completa e instalable. El instalador compila y l
 H2 "1.1 Funcionalidades entregadas"
 Bullet "Inicio (Home) con estado en línea de VTI/VTech, última actualización, distribución por tipo, equipos por área, últimos equipos y accesos rápidos."
 Bullet "Autenticación por cookie con roles Administrador y Usuario; menú y rutas protegidas."
-Bullet "Configuración en 6 pestañas: SQL Server, MAPICS (ODBC), tablas del sistema, equipos, tablas VTI/VTech e Import/Export JSON."
+Bullet "Configuración en 6 pestañas: SQL Server (configuración + operacional), MAPICS (ODBC), tablas del sistema, equipos, tablas VTI/VTech e Import/Export JSON."
+Bullet "Persistencia de las conexiones en la base de configuración, cifradas con DPAPI."
+Bullet "Dos orígenes de datos: base de configuración (catálogo de la app) y base operacional (tablas VTI/VTech) que consulta /query."
 Bullet "Consulta dinámica con selección de tabla, columnas, filtros por tipo, área, equipo (DeviceId) y rango de fechas, más gráfico interactivo."
 Bullet "Exportación de resultados a Excel y a PDF."
 Bullet "Usuarios: alta, edición, borrado y activación con hash de contraseña."
-Bullet "Sistema de actualizaciones con aviso al administrador y changelog para el resto de usuarios."
+Bullet "Sistema de actualizaciones: consulta a GitHub Releases desde el servidor y aviso al administrador y al resto de usuarios."
 Bullet "Instalador Inno Setup dual (IIS o Windows Service) y publicación automatizada en GitHub Actions."
 Bullet "Health checks en /health (JSON) y /health/live (texto)."
 
@@ -227,16 +229,16 @@ Shot "02-home.png" "Figura 2. Inicio: KPIs de VTI/VTech, distribución por tipo 
 Shot "03-home-completo.png" "Figura 3. Inicio completo (captura de página completa)."
 
 H2 "4.2 Configuración"
-P "Seis pestañas. SQL Server define la conexión principal (usada para la base de configuración y para leer el catálogo de equipos); MAPICS (ODBC) permite registrar la conexión de MAPICS."
-Shot "04-configuracion-sql.png" "Figura 4. Configuración - conexión SQL Server. La contraseña nunca se escribe en logs."
+P "Seis pestañas. La primera define las dos conexiones SQL (configuración y operacional) y permite guardarlas; la de MAPICS registra la conexión ODBC."
+Shot "04-configuracion-sql.png" "Figura 4. Arriba, base de configuración con el botón Guardar conexiones. Abajo, base operacional (VTI/VTech) que consulta /query. Las contraseñas se cifran con DPAPI y nunca se muestran."
 Shot "05-configuracion-mapics.png" "Figura 5. Configuración - conexión MAPICS por ODBC."
 Shot "06-configuracion-tablas-sistema.png" "Figura 6. Configuración - tablas del sistema SXA_RTX_*."
-Shot "07-configuracion-equipos.png" "Figura 7. Configuración - equipos: DeviceId, nombre y área."
+Shot "07-configuracion-equipos.png" "Figura 7. Configuración - equipos: DeviceId, tipo (de SXA_PCs), nombre y área."
 Shot "08-configuracion-tablas-vti-vtech.png" "Figura 8. Configuración - tablas operativas VTI/VTech."
-Shot "09-configuracion-importexport.png" "Figura 9. Configuración - Import/Export en JSON para migrar la configuración entre equipos."
+Shot "09-configuracion-importexport.png" "Figura 9. Import/Export en JSON. El export nunca incluye cadenas de conexión ni hashes de contraseña; los usuarios importados quedan inactivos y con contraseña pendiente."
 
 H2 "4.3 Consulta dinámica"
-P "Se eligen tabla, columnas y filtros. El listado de tablas se filtra por el catálogo SXA_RTX_TablasConfig según el tipo VTI/VTech. El resultado se puede graficar y exportar."
+P "Se eligen tabla, columnas y filtros. El listado de tablas se filtra por el catálogo SXA_RTX_TablasConfig según el tipo VTI/VTech. La cabecera indica si los datos salen de la base operacional configurada o de la base de configuración. El resultado se puede graficar y exportar."
 Shot "10-consulta-configurada.png" "Figura 10. Consulta dinámica con tabla y columnas seleccionadas."
 Shot "11-consulta-resultados.png" "Figura 11. Resultado de la consulta con gráfico y tabla de datos (exportable a Excel y PDF)."
 
@@ -249,17 +251,20 @@ BreakPage
 H1 "5. Sistema de actualizaciones"
 
 H2 "5.1 Cómo funciona"
-P "El aviso de actualización se alimenta de GitHub Releases; no hay un servidor de versiones propio."
+P "El aviso de actualización se alimenta de GitHub Releases; no hay un servidor de versiones propio. Solo el servidor consulta GitHub, así que el coste no depende del número de usuarios."
 Code @(
-  "1. GET /api/version           -> version ensamblada en ejecucion (1.1.1.0)",
-  "2. GET /api/updates/check     -> consulta GET https://api.github.com/repos/",
-  "                                 hector1516/SXA-RTX-Analytics/releases/latest",
-  "3. Compara ambas versiones     -> hasUpdate = actual < publicada",
-  "4. Si hay version nueva:",
-  "     Administrador  -> modal 'Actualizacion disponible' + changelog",
-  "     Resto usuarios -> modal 'Novedades' una vez (localStorage)",
+  "1. UpdateCheckWorker (hosted service) consulta, cada 60 min por defecto:",
+  "     GET https://api.github.com/repos/hector1516/SXA-RTX-Analytics/releases/latest",
+  "2. Compara la version ensamblada (p. ej. 1.1.3.0) con el tag publicado (v1.1.3)",
+  "   usando Version, no comparacion de cadenas.",
+  "3. Guarda el resultado en memoria. /api/updates/check responde desde esa cache,",
+  "   de modo que cargar una pagina no genera trafico a GitHub.",
+  "4. El navegador consulta /api/updates/check al cargar y cada 60 min:",
+  "     Administrador   -> modal 'Actualizacion disponible' + changelog",
+  "     Resto usuarios  -> modal 'Novedades' una vez (localStorage)",
   "5. Boton Actualizar / Ver release -> abre la pagina del release en GitHub."
 )
+P "Si GitHub no responde se conserva el ultimo resultado correcto y se registra el error en el log; la app sigue funcionando con normalidad."
 
 H2 "5.2 Qué hace y qué no hace"
 Table @("Comportamiento", "Estado") @(
@@ -271,7 +276,11 @@ Table @("Comportamiento", "Estado") @(
 )
 P "Importante: el botón Actualizar abre GitHub Releases. La actualización real se hace ejecutando el instalador publicado en el servidor y reiniciando el App Pool de IIS (o el servicio de Windows)."
 
-H2 "5.3 Captura del aviso"
+H2 "5.3 Configuración del intervalo"
+Bullet "UpdateCheck:IntervalMinutes en appsettings.json (60 por defecto)."
+Bullet "Clave App.UpdateCheckMinutes para ajustarlo en caliente; 0 desactiva la comprobación."
+
+H2 "5.4 Captura del aviso"
 Shot "15-actualizacion-disponible.png" "Figura 13. Aviso de actualizacion disponible para el administrador (escenario simulado: app en una version anterior y release nuevo publicado en GitHub)."
 
 BreakPage
@@ -325,35 +334,32 @@ Table @("Proyecto", "Pruebas", "Resultado") @(
   @("SXA.RTX.Analytics.Domain.Tests", "4", "Correctas"),
   @("SXA.RTX.Analytics.Application.Tests", "2", "Correctas"),
   @("SXA.RTX.Analytics.Reporting.Tests", "3", "Correctas"),
-  @("Total", "9", "9 correctas, 0 fallidas")
+  @("SXA.RTX.Analytics.Infrastructure.Tests", "21", "Correctas"),
+  @("Total", "30", "30 correctas, 0 fallidas")
 )
+P "Los tests de Infrastructure cubren la precedencia de las conexiones (valor guardado > appsettings > variable de entorno), el cifrado de secretos, que el export JSON nunca filtra contraseñas ni hashes, que el import deja los usuarios inactivos y bloqueados, y los timeouts de conexión SQL."
 P "La compilación de la solución en Release finaliza con 0 errores."
 
 BreakPage
 
 # ------------------------------------------ 9. Pendientes -------------------
 H1 "9. Limitaciones y trabajo pendiente"
-H2 "9.1 PENDIENTE - configuración de base de datos"
-Bullet "No hay conexión real a SQL Server: la aplicación opera con EF Core InMemory y datos de demostración."
-Bullet "/configuration muestra la cadena de conexión pero todavía no la persiste; hay que definir el mecanismo (User Secrets, appsettings o tabla de configuración)."
-Bullet "/query usa la conexión de la base de configuración, por lo que consulta tablas de la base de configuración y no la base operacional. Hace falta un segundo origen de datos configurable para las tablas VTI/VTech."
-Bullet "Las conexiones SQL tienen ahora timeout de 5 s (ConnectTimeout) y 15 s de comando, con paso a datos demo si el servidor no responde. Falta validar los tiempos con el SQL real de la planta."
-Bullet "Equipo.Tipo se guarda al copiar de SXA_PCs.TipoMaquina y el filtro por tipo de /query ya lo consume. Falta revisar el esquema si la base ya existe (EnsureCreated no agrega columnas)."
+H2 "9.1 Pendiente de validar en planta"
+Bullet "Conectar el SQL Server real: hasta ahora la app opera con EF Core InMemory y datos de demostracion. Hay que crear la base SXA_RTX_Analytics en el servidor y cargar las tablas."
+Bullet "Configurar la base operacional en /configuration y comprobar que la cabecera de /query deja de mostrar 'Base de configuracion'."
+Bullet "Ajustar los timeouts (5 s de conexion, 15 s de comando) si la red de planta lo exige."
+Bullet "Como el esquema se crea con EnsureCreated, una base existente no gana columnas nuevas (por ejemplo Equipo.Tipo). Para produccion conviene migrar a migraciones de EF Core."
 
-H2 "9.2 PENDIENTE - instalador y despliegue"
+H2 "9.2 Pendiente - instalador y despliegue"
 Bullet "El instalador detecta IIS pero no instala el Hosting Bundle; debe descargarse e instalarse previamente."
 Bullet "El instalador no solicita la cadena de conexión ni crea la base de datos."
 Bullet "El sitio se crea en el puerto 5000; conviene parametrizarlo y configurar HTTPS."
 
-H2 "9.3 PENDIENTE - actualizaciones automáticas"
+H2 "9.3 Pendiente - actualizaciones automáticas"
 Bullet "Implementar descarga e instalación automática y reinicio del App Pool si se requiere actualización desatendida."
-Bullet "Revisar el aviso de '60 minutos': actualmente la comprobación ocurre una vez al cargar la página, no de forma periódica."
 
 H2 "9.4 Otros puntos técnicos"
-Bullet "Migraciones de EF Core: se usa EnsureCreated(); conviene migrar a migraciones formales antes de producción."
 Bullet "La exportación a PDF incluye la tabla y el resumen, pero no la imagen del gráfico."
-Bullet "El importador de configuración no restaura usuarios aunque la interfaz los mencione."
-Bullet "Las pestañas de Configuración ya no dejan el spinner colgado si una consulta falla (try/finally), pero conviene un mensaje de error visible para el usuario."
 Bullet "El proyecto apunta a net10.0; la especificación original era .NET 8 LTS. Verificar la versión del runtime en el servidor."
 Bullet "Las capturas de esta informe se generaron en un navegador sin tipografía de emoji; en el equipo del usuario los iconos se muestran correctamente."
 

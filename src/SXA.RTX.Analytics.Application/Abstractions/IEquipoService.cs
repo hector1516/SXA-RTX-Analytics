@@ -7,7 +7,8 @@ public sealed record EquipoDto(
     string DeviceId,
     string Nombre,
     string Area,
-    EquipoTipo? TipoSync, // traído de SXA_PCs.TipoMaquina, solo lectura
+    int Tipo, // persistido: 1=VTI, 2=VTech, 0=desconocido (copiado de SXA_PCs.TipoMaquina)
+    EquipoTipo? TipoSync, // leído en vivo del catálogo SXA_PCs, solo lectura
     string? NombrePCSync,
     DateTime? UltimoContacto,
     bool IsActive);

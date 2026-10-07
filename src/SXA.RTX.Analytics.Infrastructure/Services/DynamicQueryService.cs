@@ -56,7 +56,7 @@ public sealed class DynamicQueryService : IDynamicQueryService
         var sw = Stopwatch.StartNew();
         try
         {
-            using var conn = new SqlConnection(request.ConnectionString);
+using var conn = SqlProbe.Create(request.ConnectionString);
             await conn.OpenAsync(ct);
 
             // Build SELECT
@@ -64,21 +64,34 @@ public sealed class DynamicQueryService : IDynamicQueryService
             var sql = $"SELECT TOP (@maxRows) {cols} FROM {request.TableName} WHERE 1=1";
             var parameters = new List<SqlParameter> { new("@maxRows", request.MaxRows) };
 
-            // Filtros: Tipo/Area/Equipo via OrigenPC -> join con SXA_RTX_Equipos si existe
-            // Para demo, asumimos que la tabla tiene OrigenPC y Fecha
+            // Filtro por equipo concreto.
             if (!string.IsNullOrWhiteSpace(request.DeviceId))
             {
                 sql += " AND [OrigenPC]=@deviceId";
                 parameters.Add(new SqlParameter("@deviceId", request.DeviceId));
             }
-            else if (!string.IsNullOrWhiteSpace(request.Tipo) || !string.IsNullOrWhiteSpace(request.Area))
+            // Filtro por Tipo/Area: la UI ya resolvio los DeviceId equivalentes desde la base de
+            // configuracion, asi que aqui solo se pasan como parametros. Evita depender de que la
+            // base operacional conozca SXA_RTX_Equipos.
+            else if (request.DeviceIds is not null)
             {
-                // Filtra contra la tabla de equipos de la MISMA base de configuracion
-                // (SXA_RTX_Equipos: DeviceId, Area y Tipo). Tipo viene de SXA_PCs.TipoMaquina.
-                sql += " AND [OrigenPC] IN (SELECT DeviceId FROM [dbo].[SXA_RTX_Equipos] WHERE 1=1";
-                if (!string.IsNullOrWhiteSpace(request.Tipo)) { sql += " AND Tipo=@tipo"; parameters.Add(new SqlParameter("@tipo", request.Tipo=="VTI"?1:2)); }
-                if (!string.IsNullOrWhiteSpace(request.Area)) { sql += " AND Area=@area"; parameters.Add(new SqlParameter("@area", request.Area)); }
-                sql += ")";
+                if (request.DeviceIds.Count == 0)
+                {
+                    // El filtro no deja ningun equipo: se agrega una condicion falsa en vez de
+                    // devolver la tabla completa, que seria un fallo de permisos de datos.
+                    sql += " AND 1=0";
+                }
+                else
+                {
+                    var names = new List<string>();
+                    for (var i = 0; i < request.DeviceIds.Count; i++)
+                    {
+                        var name = $"@d{i}";
+                        names.Add(name);
+                        parameters.Add(new SqlParameter(name, request.DeviceIds[i]));
+                    }
+                    sql += $" AND [OrigenPC] IN ({string.Join(", ", names)})";
+                }
             }
 
             if (request.From.HasValue && !string.IsNullOrWhiteSpace(request.DateColumn))

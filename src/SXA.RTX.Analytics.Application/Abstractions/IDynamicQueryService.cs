@@ -14,7 +14,11 @@ public sealed record DynamicQueryRequest(
     DateTime? From,
     DateTime? To,
     string? DateColumn, // auto-detected
-    int MaxRows = 1000);
+    int MaxRows = 1000,
+    // DeviceIds ya resueltos desde la base de configuracion cuando se filtra por
+    // Tipo/Area. Se pasan como parametros para no depender de que la base
+    // operacional conozca SXA_RTX_Equipos.
+    IReadOnlyList<string>? DeviceIds = null);
 
 public interface IDynamicQueryService
 {

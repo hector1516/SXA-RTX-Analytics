@@ -46,7 +46,20 @@ Salida en `publish/` (no versionar). Contiene `web.config` generado para IIS.
      - Variables de entorno del App Pool (`Configuration` → `Environment Variables`), o
      - `appsettings.Production.json` desplegado fuera del repo con ACL restringida, o
      - Registry / Key Vault según política ECCSA
-   - Clave mínima: `ConnectionStrings__ConfigurationDatabase` (doble guion bajo en env vars)
+   - Claves relevantes (doble guion bajo en variables de entorno):
+
+     | Clave | Para qué |
+     | --- | --- |
+     | `ConnectionStrings__ConfigurationDatabase` | Base de configuración de la plataforma |
+     | `ConnectionStrings__OperationalDatabase` | Base operacional que consulta `/query` (opcional) |
+     | `ConnectionStrings__MapicsOdbc` | Cadena ODBC de MAPICS (opcional) |
+
+   - Alternativa sin tocar el servidor: entrar como Administrador a `/configuration` y pulsar
+     **Guardar conexiones**. Las cadenas se cifran con DPAPI en `SXA_RTX_ApplicationSettings`
+     (atadas a la identidad del App Pool o del servicio). Precedencia completa en
+     `docs/DATABASE.md`.
+   - Después de cambiar la base operacional, recargar `/configuration` y confirmar que la cabecera
+     de `/query` ya no dice "Base de configuración".
 
 5. **Logs**
    - stdout: `logs/stdout` si se habilita en `web.config` (`stdoutLogEnabled="true"`)
@@ -55,11 +68,23 @@ Salida en `publish/` (no versionar). Contiene `web.config` generado para IIS.
 
 ## Actualización
 
-1. `dotnet publish -c Release -o publish`
-2. Detener App Pool (o `app_offline.htm` en la raíz para graceful drain)
-3. Copiar `publish/` al servidor (robocopy/xcopy)
-4. Iniciar App Pool
-5. Verificar `https://servidor/health` → `Healthy`
+1. Descargar el instalador o el ZIP del release desde
+   https://github.com/hector1516/SXA-RTX-Analytics/releases
+2. `dotnet publish -c Release -o publish` (si se compila local)
+3. Detener App Pool (o `app_offline.htm` en la raíz para graceful drain)
+4. Copiar `publish/` al servidor (robocopy/xcopy)
+5. Iniciar App Pool
+6. Verificar `https://servidor/health` → `Healthy`
+
+### Aviso de versión nueva
+
+- El servidor consulta GitHub Releases una vez cada `UpdateCheck:IntervalMinutes` (60 por
+  defecto, `0` desactiva) y guarda el resultado en memoria; los navegadores solo leen
+  `/api/updates/check`, así que el coste no depende del número de usuarios.
+- El administrador ve un modal con el changelog; el resto de usuarios lo ven una vez.
+- **El aviso no instala nada**: el botón abre la página del release. La actualización real es
+  instalar el `.exe` nuevo y reiniciar el App Pool.
+- Intervalo configurable en caliente con la clave `App.UpdateCheckMinutes`.
 
 ## Health probes
 

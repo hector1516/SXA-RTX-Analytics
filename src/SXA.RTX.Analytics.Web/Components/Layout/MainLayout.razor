@@ -1,5 +1,8 @@
 ﻿@inherits LayoutComponentBase
+@implements IDisposable
+@using SXA.RTX.Analytics.Application.Abstractions
 @inject AuthenticationStateProvider AuthState
+@inject IConfigurationService Settings
 @inject IHttpClientFactory HttpFactory
 @inject NavigationManager Nav
 @inject IJSRuntime JS
@@ -131,52 +134,93 @@
     string Version = "1.0.0";
     string? LatestVersion, Changelog, UpdateUrl;
     bool ShowUpdateAdmin, ShowChangelogAll;
+    int UpdateCheckMinutes = 60;
+    System.Threading.Timer? _timer;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
+        // Primera vez: versión + comprobación. Luego se repite cada N minutos contra
+        // /api/updates/check, que ya responde desde la caché del servidor (el servidor es
+        // el único que llama a GitHub, así que el coste no depende del número de usuarios).
+        _ = InitializeAsync();
+    }
+
+    bool _initialized;
+    async Task InitializeAsync()
+    {
+        if (_initialized) return;
+        _initialized = true;
+        await LoadUpdateInterval();
+        await RefreshVersionAndUpdates(initial: true);
+        ScheduleNextCheck();
+    }
+
+    async Task RefreshVersionAndUpdates(bool initial)
+    {
         try
         {
             var http = HttpFactory.CreateClient();
             http.BaseAddress = new Uri(Nav.BaseUri);
-            // Versión actual
-            try { var v = await http.GetFromJsonAsync<VersionInfo>("/api/version"); if (v!=null && !string.IsNullOrEmpty(v.version)) Version = v.version; } catch {}
-            // Check updates
+            try { var v = await http.GetFromJsonAsync<VersionInfo>("/api/version"); if (v != null && !string.IsNullOrEmpty(v.version)) Version = v.version; } catch { }
             var auth = await AuthState.GetAuthenticationStateAsync();
             var isAdmin = auth.User.IsInRole("Administrador");
             var upd = await http.GetFromJsonAsync<UpdateInfo>("/api/updates/check");
             if (upd != null && !string.IsNullOrEmpty(upd.latest) && upd.hasUpdate)
             {
-                LatestVersion = upd.latest?.TrimStart('v', 'V'); Changelog = upd.changelog; UpdateUrl = upd.url;
-                if (isAdmin)
+                var latest = upd.latest?.TrimStart('v', 'V');
+                Changelog = upd.changelog; UpdateUrl = upd.url;
+                // El modal solo se (re)abre si la versión es distinta a la ya mostrada.
+                if (latest != LatestVersion)
                 {
-                    ShowUpdateAdmin = true;
-                    StateHasChanged();
-                }
-                else
-                {
-                    // Para todos: si hay nueva versión y no la han visto, mostrar changelog
-                    var lastSeen = await JS.InvokeAsync<string>("eval", "localStorage.getItem('sxa_lastSeenVersion') || ''");
-                    if (lastSeen != LatestVersion)
+                    LatestVersion = latest;
+                    if (isAdmin) ShowUpdateAdmin = true;
+                    else
                     {
-                        ShowChangelogAll = true;
-                        StateHasChanged();
+                        var lastSeen = await JS.InvokeAsync<string>("eval", "localStorage.getItem('sxa_lastSeenVersion') || ''");
+                        if (lastSeen != LatestVersion) ShowChangelogAll = true;
                     }
                 }
             }
-            else if (upd != null && !upd.hasUpdate && !string.IsNullOrEmpty(upd.latest))
+        }
+        catch (JSDisconnectedException) { }
+        catch (ObjectDisposedException) { }
+        catch { }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    void ScheduleNextCheck()
+    {
+        var minutes = UpdateCheckMinutes;
+        if (minutes <= 0) return;
+        _timer?.Dispose();
+        _timer = new System.Threading.Timer(async _ =>
+        {
+            try
             {
-                // Sin update, pero si el usuario no ha visto el changelog de la versión actual, mostrarlo una vez
-                var lastSeen = await JS.InvokeAsync<string>("eval", "localStorage.getItem('sxa_lastSeenVersion') || ''");
-                if (lastSeen != Version && !string.IsNullOrEmpty(Version))
-                {
-                    // No mostrar a menos que sea nueva instalación con changelog
-                }
+                // InvokeAsync lanza si el circuito ya se cerró; se captura para no matar el timer.
+                await InvokeAsync(async () => { await RefreshVersionAndUpdates(initial: false); });
             }
+            catch (ObjectDisposedException) { }
+            catch (JSDisconnectedException) { }
+            catch (InvalidOperationException) { }
+        }, null, TimeSpan.FromMinutes(minutes), Timeout.InfiniteTimeSpan);
+    }
+
+    async Task LoadUpdateInterval()
+    {
+        try
+        {
+            var raw = await Settings.GetValueAsync(SettingsKeys.UpdateCheckMinutes);
+            if (int.TryParse(raw, out var m) && m >= 0) UpdateCheckMinutes = m;
         }
         catch { }
-        // La versión del footer y cualquier modal se pintan siempre
-        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+        _timer = null;
     }
     async Task DismissChangelog()
     {

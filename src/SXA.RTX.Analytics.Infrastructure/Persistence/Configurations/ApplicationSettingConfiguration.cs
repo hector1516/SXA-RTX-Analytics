@@ -8,7 +8,7 @@ public sealed class ApplicationSettingConfiguration : IEntityTypeConfiguration<A
 {
     public void Configure(EntityTypeBuilder<ApplicationSetting> builder)
     {
-        builder.ToTable("ApplicationSettings");
+        builder.ToTable("SXA_RTX_ApplicationSettings");
         builder.HasKey(x => x.Id);
         builder.HasIndex(x => x.Key).IsUnique();
         builder.Property(x => x.Key).HasMaxLength(200).IsRequired();

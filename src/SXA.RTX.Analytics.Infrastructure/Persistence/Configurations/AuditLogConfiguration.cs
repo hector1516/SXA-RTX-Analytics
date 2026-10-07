@@ -8,7 +8,7 @@ public sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
 {
     public void Configure(EntityTypeBuilder<AuditLog> builder)
     {
-        builder.ToTable("AuditLogs");
+        builder.ToTable("SXA_RTX_AuditLogs");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.TimestampUtc).IsRequired();
         builder.Property(x => x.Action).HasMaxLength(100).IsRequired();

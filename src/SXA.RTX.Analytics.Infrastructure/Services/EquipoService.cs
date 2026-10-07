@@ -47,7 +47,7 @@ public sealed class EquipoService : IEquipoService
     {
         var equipos = await _db.Set<Equipo>().AsNoTracking().ToListAsync(ct);
         // Para Tipo, necesitamos cruzar con catalog. Aquí solo devolvemos sin Tipo, el caller hará merge.
-        return equipos.Select(e => new EquipoDto(e.Id, e.DeviceId, e.Nombre, e.Area, null, null, null, e.IsActive)).ToList();
+        return equipos.Select(e => new EquipoDto(e.Id, e.DeviceId, e.Nombre, e.Area, e.Tipo, null, null, null, e.IsActive)).ToList();
     }
 
     public async Task<(bool Success, string Message)> UpsertAsync(string deviceId, string nombre, string area, string? tipoMaquina = null, CancellationToken ct = default)

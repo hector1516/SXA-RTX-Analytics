@@ -7,7 +7,8 @@
 @inject IEquipoService EquipoService
 @inject ITablasConfigService TablasService
 @inject IConfigExportService ExportService
-@inject IConfiguration Config
+@inject IDataSourceService DataSources
+@inject IConfigurationService Settings
 @inject IJSRuntime JS
 
 <PageTitle>Configuración — SXA-RTX Analytics</PageTitle>
@@ -34,10 +35,10 @@
 
 @if (ActiveTab == 0)
 {
-    <div class="card">
+    <div class="card mb-3">
         <div class="card-body">
-            <h5 class="card-title">SQL Server — Conexión principal</h5>
-            <p class="text-muted small">Usada para <code>ConfigurationDatabase (SXA_RTX_Analytics)</code> y para listar “carpetas” (bases) y catálogo <code>SXA_PCs</code>. Credencial solo lectura recomendada.</p>
+            <h5 class="card-title">SQL Server — Base de configuración</h5>
+            <p class="text-muted small">Guarda el catálogo de la plataforma: <code>SXA_RTX_Equipos</code>, <code>SXA_RTX_TablasConfig</code>, usuarios y ajustes. También se usa para leer el catálogo de equipos <code>dbo.SXA_PCs</code> del central de Sync. Credencial solo lectura recomendada.</p>
             <div class="row g-3">
                 <div class="col-md-6"><label class="form-label">Servidor</label><input class="form-control" @bind="SqlServer" placeholder="SRVSQL01\SQLEXPRESS" /></div>
                 <div class="col-md-3"><label class="form-label">Autenticación</label><select class="form-select" @bind="SqlAuth"><option value="sql">SQL Server</option><option value="win">Windows</option></select></div>
@@ -45,15 +46,34 @@
                 <div class="col-md-6"><label class="form-label">Base de configuración</label><input class="form-control" @bind="SqlDatabase" placeholder="SXA_RTX_Analytics" /></div>
                 <div class="col-md-3"><label class="form-label">Usuario</label><input class="form-control" @bind="SqlUser" disabled="@(SqlAuth=="win")" /></div>
                 <div class="col-md-3"><label class="form-label">Contraseña</label><input type="password" class="form-control" @bind="SqlPassword" disabled="@(SqlAuth=="win")" /></div>
-                <div class="col-12"><label class="form-label">Cadena resultante (no se loguea)</label><input class="form-control font-monospace small" value="@BuildSqlConnectionString()" readonly /></div>
+                <div class="col-12"><label class="form-label">Cadena resultante (la contraseña no se muestra)</label><input class="form-control font-monospace small" value="@BuildSqlConnectionString()" readonly /></div>
             </div>
-            <div class="d-flex gap-2 mt-3">
+            <div class="d-flex gap-2 mt-3 flex-wrap">
                 <button class="btn btn-primary" @onclick="TestSql" disabled="@IsTestingSql">@if (IsTestingSql) { <span class="spinner-border spinner-border-sm"></span> @(" Probando...") } else { @("Probar conexión") }</button>
                 <button class="btn btn-outline-primary" @onclick="LoadDatabases" disabled="@(!SqlTestOk)">Cargar bases (carpetas)</button>
+                <button class="btn btn-success" @onclick="SaveConnections" disabled="@IsSavingConnections">@if (IsSavingConnections) { <span class="spinner-border spinner-border-sm"></span> @(" Guardando...") } else { @("Guardar conexiones") }</button>
                 <button class="btn btn-outline-secondary" @onclick="() => { ActiveTab=3; _ = LoadEquipos(); }">Ir a Equipos →</button>
             </div>
             @if (!string.IsNullOrEmpty(SqlTestMsg)) { <div class="alert @(SqlTestOk ? "alert-success" : "alert-danger") mt-3 py-2 small">@SqlTestMsg</div> }
+            @if (!string.IsNullOrEmpty(SaveConnMsg)) { <div class="alert @(SaveConnOk ? "alert-success" : "alert-danger") mt-3 py-2 small">@SaveConnMsg</div> }
             @if (Databases.Count > 0) { <hr /><h6>Carpetas / Bases disponibles</h6><div class="row g-2">@foreach (var db in Databases) { <div class="col-md-4"><label class="d-flex align-items-center gap-2 border rounded-3 p-2 bg-white"><input type="checkbox" @bind="db.IsSelected" /><span class="small">@db.Name</span></label></div> }</div><div class="text-muted small mt-2">@Databases.Count(b => b.IsSelected) seleccionadas</div> }
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">SQL Server — Base operacional (VTI / VTech)</h5>
+            <p class="text-muted small">Es la base que consulta <code>/query</code>. Déjala vacía para usar la base de configuración.</p>
+            <div class="row g-3">
+                <div class="col-md-6"><label class="form-label">Servidor operacional</label><input class="form-control" @bind="OpServer" placeholder="SRVSQL01\SQLEXPRESS" /></div>
+                <div class="col-md-6"><label class="form-label">Base operacional</label><input class="form-control" @bind="OpDatabase" placeholder="SXA_VTI_VTech" /></div>
+                <div class="col-md-3"><label class="form-label">Usuario</label><input class="form-control" @bind="OpUser" /></div>
+                <div class="col-md-3"><label class="form-label">Contraseña</label><input type="password" class="form-control" @bind="OpPassword" /></div>
+                <div class="col-md-3"><label class="form-label">Nombre para la UI</label><input class="form-control" @bind="OpSourceName" placeholder="VTI / VTech (producción)" /></div>
+                <div class="col-md-3 d-flex align-items-end"><button class="btn btn-outline-primary" @onclick="TestOperational" disabled="@(IsTestingOp||string.IsNullOrWhiteSpace(BuildOperationalConnectionString()))">@if (IsTestingOp) { <span class="spinner-border spinner-border-sm"></span> @(" Probando...") } else { @("Probar conexión operacional") }</button></div>
+                <div class="col-12"><label class="form-label">Cadena resultante (la contraseña no se muestra)</label><input class="form-control font-monospace small" value="@BuildOperationalConnectionStringMasked()" readonly /></div>
+            </div>
+            @if (!string.IsNullOrEmpty(OpTestMsg)) { <div class="alert @(OpTestOk ? "alert-success" : "alert-danger") mt-3 py-2 small">@OpTestMsg</div> }
         </div>
     </div>
 }
@@ -204,6 +224,11 @@ else if (ActiveTab == 5)
     string SqlServer = "localhost"; string SqlDatabase = "SXA_RTX_Analytics"; string SqlAuth = "sql"; string SqlUser = ""; string SqlPassword = ""; bool SqlEncrypt = true; bool SqlTrust = true;
     bool IsTestingSql = false; bool SqlTestOk = false; string? SqlTestMsg; List<DatabaseOptionMutable> Databases = new();
 
+    // Base operacional (tablas VTI/VTech)
+    string OpServer = ""; string OpDatabase = ""; string OpUser = ""; string OpPassword = ""; string OpSourceName = "";
+    bool IsTestingOp = false; bool OpTestOk = false; string? OpTestMsg;
+    bool IsSavingConnections = false; string? SaveConnMsg; bool SaveConnOk; bool ConnectionsLoaded;
+
     // ODBC
     string OdbcConnectionString = "DSN=MAPICS;"; bool IsTestingOdbc = false; bool OdbcTestOk = false; string? OdbcTestMsg;
 
@@ -221,10 +246,58 @@ else if (ActiveTab == 5)
     // Import/Export
     bool IsExporting = false; bool IsImporting = false; string? ImportExportMsg; bool ImportExportOk = false; string? ExportPreview;
 
-    protected override async Task OnInitializedAsync() { await LoadTables(); await LoadEquipos(); }
+    protected override async Task OnInitializedAsync() { await LoadConnections(); await LoadTables(); await LoadEquipos(); }
 
     string BuildSqlConnectionString() => SqlAuth=="win" ? $"Server={SqlServer};Database={SqlDatabase};Trusted_Connection=True;Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};" : $"Server={SqlServer};Database={SqlDatabase};User Id={SqlUser};Password=***;Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};";
     string BuildSqlConnectionStringReal() => SqlAuth=="win" ? $"Server={SqlServer};Database={SqlDatabase};Trusted_Connection=True;Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};" : $"Server={SqlServer};Database={SqlDatabase};User Id={SqlUser};Password={SqlPassword};Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};";
+    string BuildOperationalConnectionString() => string.IsNullOrWhiteSpace(OpServer) || string.IsNullOrWhiteSpace(OpDatabase) ? "" : $"Server={OpServer};Database={OpDatabase};User Id={OpUser};Password={OpPassword};Encrypt=True;TrustServerCertificate=True;";
+    string BuildOperationalConnectionStringMasked() => string.IsNullOrWhiteSpace(OpServer) || string.IsNullOrWhiteSpace(OpDatabase) ? "" : $"Server={OpServer};Database={OpDatabase};User Id={OpUser};Password=***;Encrypt=True;TrustServerCertificate=True;";
+
+    // Rellena los campos con lo ya guardado. La contraseña no se puede leer de
+    // la base (DPAPI + no se expone en la UI), asi que si hay una guardada el
+    // administrador debe escribirla de nuevo para sobrescribirla.
+    async Task LoadConnections()
+    {
+        try
+        {
+            var s = await DataSources.GetAsync();
+            ApplyConnectionString(BuildSqlConnectionStringReal(), ref SqlServer, ref SqlDatabase, ref SqlUser);
+            ApplyConnectionString(s.ConfigurationConnectionString, ref SqlServer, ref SqlDatabase, ref SqlUser);
+            ApplyConnectionString(s.OperationalConnectionString, ref OpServer, ref OpDatabase, ref OpUser);
+            OpSourceName = await Settings.GetValueAsync(SettingsKeys.OperationalSourceName) ?? "";
+            OdbcConnectionString = s.OdbcConnectionString ?? OdbcConnectionString;
+            ConnectionsLoaded = true;
+        }
+        catch { /* la app arranca igual con appsettings */ }
+    }
+
+    void ApplyConnectionString(string? cs, ref string server, ref string database, ref string user)
+    {
+        if (string.IsNullOrWhiteSpace(cs)) return;
+        try
+        {
+            var b = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(cs);
+            server = b.DataSource; database = b.InitialCatalog; user = b.UserID ?? "";
+        }
+        catch { /* cadena no parseable: se deja lo que haya */ }
+    }
+
+    async Task SaveConnections()
+    {
+        IsSavingConnections = true; SaveConnMsg = null;
+        try
+        {
+            await DataSources.SaveAsync(BuildSqlConnectionStringReal(), BuildOperationalConnectionString(), OdbcConnectionString);
+            await Settings.SetValueAsync(SettingsKeys.OperationalSourceName, OpSourceName ?? "");
+            SaveConnOk = true;
+            SaveConnMsg = "Conexiones guardadas en la base de configuración y cifradas con DPAPI. Si la app está en modo InMemory se pierden al reiniciar.";
+            ConnectionsLoaded = true;
+        }
+        catch (Exception ex) { SaveConnOk = false; SaveConnMsg = "No se pudo guardar: " + ex.Message; }
+        finally { IsSavingConnections = false; }
+    }
+
+    async Task TestOperational(){ IsTestingOp=true; OpTestMsg=null; var (ok,msg)=await SystemService.TestSqlConnectionAsync(BuildOperationalConnectionString()); OpTestOk=ok; OpTestMsg=msg; IsTestingOp=false; }
 
     async Task TestSql(){ IsTestingSql=true; SqlTestMsg=null; var (ok,msg)=await SystemService.TestSqlConnectionAsync(BuildSqlConnectionStringReal()); SqlTestOk=ok; SqlTestMsg=msg; IsTestingSql=false; }
     async Task LoadDatabases(){ var list=await SystemService.ListDatabasesAsync(BuildSqlConnectionStringReal()); Databases=list.Select(n=>new DatabaseOptionMutable{Name=n}).ToList(); }

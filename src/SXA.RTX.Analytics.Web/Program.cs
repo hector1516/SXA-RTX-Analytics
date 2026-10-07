@@ -9,6 +9,7 @@ using SXA.RTX.Analytics.Infrastructure.Extensions;
 using SXA.RTX.Analytics.Infrastructure.Persistence;
 using SXA.RTX.Analytics.Reporting.Extensions;
 using SXA.RTX.Analytics.Web.Components;
+using SXA.RTX.Analytics.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseWindowsService();
@@ -49,6 +50,9 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddReportingEngine();
 
 builder.Services.AddHttpClient();
+builder.Services.Configure<UpdateCheckOptions>(builder.Configuration.GetSection("UpdateCheck"));
+builder.Services.AddSingleton<UpdateCheckCache>();
+builder.Services.AddHostedService<UpdateCheckWorker>();
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ConfigurationDbContext>(name: "configuration_database", failureStatus: HealthStatus.Degraded, tags: ["db", "configuration"])
     .AddCheck("self", () => HealthCheckResult.Healthy("Application is running"), tags: ["live"]);
@@ -80,43 +84,20 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 });
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = r => r.Tags.Contains("live"), ResponseWriter = async (ctx, report) => { ctx.Response.ContentType = "text/plain"; await ctx.Response.WriteAsync(report.Status == HealthStatus.Healthy ? "Healthy" : "Unhealthy"); } });
 
-// Normaliza "v1.1.1", "1.1.1", "1.1.1.0" y "1.1.1.0-beta" a una forma comparable.
-static string NormalizeVersion(string? raw)
-{
-    if (string.IsNullOrWhiteSpace(raw)) return "0.0.0";
-    var s = raw.Trim().TrimStart('v', 'V');
-    var dash = s.IndexOfAny(new[] { '-', '+' });
-    if (dash >= 0) s = s[..dash];
-    var parts = s.Split('.', StringSplitOptions.RemoveEmptyEntries)
-                 .Select(p => int.TryParse(p, out var n) ? n : 0)
-                 .Take(4)
-                 .ToList();
-    while (parts.Count < 3) parts.Add(0);
-    return string.Join('.', parts);
-}
-
 app.MapGet("/api/version", (IConfiguration cfg) =>
 {
     var v = typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.0";
     return Results.Json(new { version = v, exportedAt = DateTime.UtcNow });
 });
 
-app.MapGet("/api/updates/check", async (IConfiguration cfg, HttpClient http) =>
+// Responde desde la caché que mantiene UpdateCheckWorker. Así GitHub se consulta
+// una vez cada intervalo, no en cada carga de página de cada usuario.
+app.MapGet("/api/updates/check", (UpdateCheckCache cache) =>
 {
-    try
-    {
-        var current = typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.0";
-        // Usa GitHub Releases como fuente de changelog (público)
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("SXA-RTX-Analytics");
-        var latest = await http.GetFromJsonAsync<GitHubRelease>("https://api.github.com/repos/hector1516/SXA-RTX-Analytics/releases/latest");
-        if (latest is null) return Results.Json(new { current, hasUpdate = false });
-        var hasUpdate = System.Version.TryParse(NormalizeVersion(current), out var cur)
-                     && System.Version.TryParse(NormalizeVersion(latest.tag_name), out var lat)
-                        ? cur < lat
-                        : !string.Equals(NormalizeVersion(latest.tag_name), NormalizeVersion(current), StringComparison.OrdinalIgnoreCase);
-        return Results.Json(new { current, latest = latest.tag_name, hasUpdate, changelog = latest.body, url = latest.html_url });
-    }
-    catch (Exception ex) { return Results.Json(new { error = ex.Message }, statusCode: 500); }
+    var r = cache.Current;
+    if (r is null)
+        return Results.Json(new { current = typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.0", latest = (string?)null, hasUpdate = false, changelog = (string?)null, url = (string?)null, checkedAtUtc = (DateTimeOffset?)null });
+    return Results.Json(new { current = r.Current, latest = r.Latest, hasUpdate = r.HasUpdate, changelog = r.Changelog, url = r.Url, checkedAtUtc = r.CheckedAtUtc, error = r.Error });
 });
 
 app.MapGet("/logout", async (HttpContext ctx) =>

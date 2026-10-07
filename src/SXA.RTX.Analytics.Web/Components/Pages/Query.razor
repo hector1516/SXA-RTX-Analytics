@@ -8,13 +8,29 @@
 @inject ITablasConfigService TablasService
 @inject IEquipoService EquipoService
 @inject IExportService ExportService
+@inject IDataSourceService DataSources
+@inject IConfigurationService Settings
 @inject IJSRuntime JS
-@inject IConfiguration Config
 
 <PageTitle>Consulta — SXA-RTX Analytics</PageTitle>
 
-<h3 class="fw-bold" style="letter-spacing:-.02em">Consulta dinámica</h3>
-<p class="text-muted small">Elige tabla (filtrada por <code>SXA_RTX_TablasConfig VTI/VTech</code>), columnas y filtros.</p>
+<div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-1">
+    <div>
+        <h3 class="fw-bold mb-0" style="letter-spacing:-.02em">Consulta dinámica</h3>
+        <p class="text-muted small mb-0">Elige tabla (filtrada por <code>SXA_RTX_TablasConfig VTI/VTech</code>), columnas y filtros.</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        @if (!UsesOperationalSource)
+        {
+            <span class="rtx-pill rtx-pill--honey" title="No hay base operacional configurada: se consulta la base de configuración">Base de configuración</span>
+        }
+        else
+        {
+            <span class="rtx-pill rtx-pill--mint" title="Origen de datos operacional configurado en /configuration">@(string.IsNullOrWhiteSpace(OperationalSourceName) ? "Base operacional" : OperationalSourceName)</span>
+        }
+        <a href="/configuration" class="btn btn-sm btn-outline-secondary">Configurar</a>
+    </div>
+</div>
 
 <div class="card mb-3">
     <div class="card-body">
@@ -102,6 +118,9 @@
 
 @code {
     string ConnStr = "";
+    string ConfigConnStr = "";
+    string OperationalSourceName = "";
+    bool UsesOperationalSource;
     string FiltroTipo = "";
     string SelectedTable = "";
     List<string> AllTablas = new();
@@ -120,9 +139,14 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var cs = Config.GetConnectionString("ConfigurationDatabase");
-        ConnStr = cs ?? "";
-        Catalog = (await EquipoService.GetCatalogAsync(cs)).ToList();
+        // ConfigStrings: base de configuracion (catálogo, SXA_RCs). ConnStr: base operacional
+        // (tablas VTI/VTech). Si no hay operacional configurada se usa la de configuración.
+        var ds = await DataSources.GetAsync();
+        ConfigConnStr = ds.ConfigurationConnectionString ?? "";
+        ConnStr = ds.EffectiveOperationalConnectionString ?? "";
+        OperationalSourceName = await Settings.GetValueAsync(SettingsKeys.OperationalSourceName) ?? "";
+        UsesOperationalSource = !ds.OperationalFallsBackToConfiguration;
+        Catalog = (await EquipoService.GetCatalogAsync(ConfigConnStr)).ToList();
         Areas = (await EquipoService.GetEquiposAsync()).Select(e=>e.Area).Distinct().ToList();
         await LoadTablas();
     }
@@ -144,11 +168,43 @@
     async Task Ejecutar(){
         if (string.IsNullOrEmpty(SelectedTable)) { Msg="Selecciona tabla"; Ok=false; return; }
         IsRunning=true; Msg=null;
-        var req = new DynamicQueryRequest(ConnStr, SelectedTable, SelectedColumns.ToList(), string.IsNullOrEmpty(FiltroTipo)?null:FiltroTipo, string.IsNullOrEmpty(FiltroArea)?null:FiltroArea, string.IsNullOrEmpty(FiltroDevice)?null:FiltroDevice, FiltroFrom, FiltroTo, string.IsNullOrEmpty(DateColumn)?null:DateColumn, MaxRows);
+        try
+        {
+        // Tipo/Area se resuelven aqui contra los equipos de la base de configuracion y se
+        // envian como DeviceIds: asi la base operacional no necesita conocer SXA_RTX_Equipos.
+        List<string>? deviceIds = null;
+        var usaTipo = !string.IsNullOrEmpty(FiltroTipo);
+        var usaArea = !string.IsNullOrEmpty(FiltroArea);
+        if (string.IsNullOrEmpty(FiltroDevice) && (usaTipo || usaArea))
+        {
+            var todos = await EquipoService.GetEquiposAsync();
+            var filtrados = todos.AsEnumerable();
+            if (usaTipo) filtrados = filtrados.Where(e => TipoDeEquipo(e) == FiltroTipo);
+            if (usaArea) filtrados = filtrados.Where(e => string.Equals(e.Area, FiltroArea, StringComparison.OrdinalIgnoreCase));
+            deviceIds = filtrados.Select(e => e.DeviceId).ToList();
+        }
+        var req = new DynamicQueryRequest(ConnStr, SelectedTable, SelectedColumns.ToList(), string.IsNullOrEmpty(FiltroTipo)?null:FiltroTipo, string.IsNullOrEmpty(FiltroArea)?null:FiltroArea, string.IsNullOrEmpty(FiltroDevice)?null:FiltroDevice, FiltroFrom, FiltroTo, string.IsNullOrEmpty(DateColumn)?null:DateColumn, MaxRows, deviceIds);
         Result = await QueryService.ExecuteAsync(req);
-        Msg = $"{Result.Rows.Count} filas en {Result.ExecutionTime.TotalMilliseconds:F0} ms"; Ok=true; IsRunning=false;
+        Msg = $"{Result.Rows.Count} filas en {Result.ExecutionTime.TotalMilliseconds:F0} ms";
+        if (deviceIds is { Count: 0 })
+            Msg += $" — sin equipos que cumplan el filtro (0 de {Catalog.Count} del catálogo), por eso no hay datos";
+        Ok=true;
         // Auto-select chart axes
         if (Result.Columns.Count>=2){ ChartX = Result.Columns[0].Name; ChartY = Result.Columns.FirstOrDefault(c=>c.DataType.Name.Contains("Int", StringComparison.OrdinalIgnoreCase)||c.DataType.Name.Contains("Single", StringComparison.OrdinalIgnoreCase) || c.DataType.Name.Contains("Double", StringComparison.OrdinalIgnoreCase) || c.DataType.Name.Contains("Float", StringComparison.OrdinalIgnoreCase)||c.DataType.Name.Contains("Decimal", StringComparison.OrdinalIgnoreCase))?.Name ?? Result.Columns[1].Name; }
+        }
+        catch (Exception ex) { Ok=false; Result=null; Msg = "Error: " + ex.Message; }
+        finally { IsRunning=false; }
+    }
+
+    // Tipo del equipo: primero el valor persistido en SXA_RTX_Equipos.Tipo y, si no esta,
+    // el que llega del catálogo SXA_PCs.TipoMaquina.
+    string TipoDeEquipo(EquipoDto e)
+    {
+        if (e.Tipo == 1) return "VTI";
+        if (e.Tipo == 2) return "VTech";
+        var cat = Catalog.FirstOrDefault(c => c.DeviceId == e.DeviceId)?.TipoMaquina;
+        return string.Equals(cat, "VTech", StringComparison.OrdinalIgnoreCase) ? "VTech"
+             : string.Equals(cat, "VTI", StringComparison.OrdinalIgnoreCase) ? "VTI" : "";
     }
 
     async Task RenderChart(){
