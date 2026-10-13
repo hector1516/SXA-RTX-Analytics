@@ -56,18 +56,21 @@ public sealed class DynamicQueryService : IDynamicQueryService
         var sw = Stopwatch.StartNew();
         try
         {
-using var conn = SqlProbe.Create(request.ConnectionString);
+var origin = ResultEnricher.SanitizeIdentifier(request.OriginColumn);
+            using var conn = SqlProbe.Create(request.ConnectionString);
             await conn.OpenAsync(ct);
 
-            // Build SELECT
-            var cols = request.Columns.Count==0 ? "*" : string.Join(", ", request.Columns.Select(c => $"[{c}]"));
+            // Build SELECT. Se fuerza la inclusion de la columna de origen para poder
+            // resolver luego NombrePC/TipoMaquina en memoria.
+            var cols = request.Columns.Count==0 ? "*"
+                : string.Join(", ", request.Columns.Append(origin).Distinct(StringComparer.OrdinalIgnoreCase).Select(c => $"[{ResultEnricher.SanitizeIdentifier(c)}]"));
             var sql = $"SELECT TOP (@maxRows) {cols} FROM {request.TableName} WHERE 1=1";
             var parameters = new List<SqlParameter> { new("@maxRows", request.MaxRows) };
 
             // Filtro por equipo concreto.
             if (!string.IsNullOrWhiteSpace(request.DeviceId))
             {
-                sql += " AND [OrigenPC]=@deviceId";
+                sql += $" AND [{origin}]=@deviceId";
                 parameters.Add(new SqlParameter("@deviceId", request.DeviceId));
             }
             // Filtro por Tipo/Area: la UI ya resolvio los DeviceId equivalentes desde la base de
@@ -90,7 +93,7 @@ using var conn = SqlProbe.Create(request.ConnectionString);
                         names.Add(name);
                         parameters.Add(new SqlParameter(name, request.DeviceIds[i]));
                     }
-                    sql += $" AND [OrigenPC] IN ({string.Join(", ", names)})";
+                    sql += $" AND [{origin}] IN ({string.Join(", ", names)})";
                 }
             }
 

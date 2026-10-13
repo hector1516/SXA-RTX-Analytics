@@ -22,6 +22,12 @@ public static class SettingsKeys
 
     /// <summary>Minutos entre comprobaciones periodicas de actualizacion (0 = solo al cargar).</summary>
     public const string UpdateCheckMinutes = "App.UpdateCheckMinutes";
+
+    /// <summary>
+    /// Nombre de la columna de origen (DeviceId) en las tablas operacionales.
+    /// Por defecto "OrigenPC". Si el central usa otro nombre, se cambia aqui sin recompilar.
+    /// </summary>
+    public const string OperationalOriginColumn = "Sql.OperationalOriginColumn";
 }
 
 /// <summary>Conexiones efectivas que usa la aplicacion.</summary>

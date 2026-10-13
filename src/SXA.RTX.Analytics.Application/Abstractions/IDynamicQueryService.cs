@@ -18,7 +18,9 @@ public sealed record DynamicQueryRequest(
     // DeviceIds ya resueltos desde la base de configuracion cuando se filtra por
     // Tipo/Area. Se pasan como parametros para no depender de que la base
     // operacional conozca SXA_RTX_Equipos.
-    IReadOnlyList<string>? DeviceIds = null);
+    IReadOnlyList<string>? DeviceIds = null,
+    // Nombre de la columna de origen (DeviceId) en la tabla operacional. null = OrigenPC.
+    string? OriginColumn = null);
 
 public interface IDynamicQueryService
 {

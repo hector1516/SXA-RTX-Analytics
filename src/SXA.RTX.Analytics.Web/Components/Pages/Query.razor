@@ -120,6 +120,7 @@
     string ConnStr = "";
     string ConfigConnStr = "";
     string OperationalSourceName = "";
+    string OriginColumn = ResultEnricher.DefaultOriginColumn;
     bool UsesOperationalSource;
     string FiltroTipo = "";
     string SelectedTable = "";
@@ -146,6 +147,7 @@
         ConnStr = ds.EffectiveOperationalConnectionString ?? "";
         OperationalSourceName = await Settings.GetValueAsync(SettingsKeys.OperationalSourceName) ?? "";
         UsesOperationalSource = !ds.OperationalFallsBackToConfiguration;
+        OriginColumn = await Settings.GetValueAsync(SettingsKeys.OperationalOriginColumn) ?? ResultEnricher.DefaultOriginColumn;
         Catalog = (await EquipoService.GetCatalogAsync(ConfigConnStr)).ToList();
         Areas = (await EquipoService.GetEquiposAsync()).Select(e=>e.Area).Distinct().ToList();
         await LoadTablas();
@@ -183,8 +185,10 @@
             if (usaArea) filtrados = filtrados.Where(e => string.Equals(e.Area, FiltroArea, StringComparison.OrdinalIgnoreCase));
             deviceIds = filtrados.Select(e => e.DeviceId).ToList();
         }
-        var req = new DynamicQueryRequest(ConnStr, SelectedTable, SelectedColumns.ToList(), string.IsNullOrEmpty(FiltroTipo)?null:FiltroTipo, string.IsNullOrEmpty(FiltroArea)?null:FiltroArea, string.IsNullOrEmpty(FiltroDevice)?null:FiltroDevice, FiltroFrom, FiltroTo, string.IsNullOrEmpty(DateColumn)?null:DateColumn, MaxRows, deviceIds);
+        var req = new DynamicQueryRequest(ConnStr, SelectedTable, SelectedColumns.ToList(), string.IsNullOrEmpty(FiltroTipo)?null:FiltroTipo, string.IsNullOrEmpty(FiltroArea)?null:FiltroArea, string.IsNullOrEmpty(FiltroDevice)?null:FiltroDevice, FiltroFrom, FiltroTo, string.IsNullOrEmpty(DateColumn)?null:DateColumn, MaxRows, deviceIds, OriginColumn);
         Result = await QueryService.ExecuteAsync(req);
+        // Resuelve NombrePC/TipoMaquina por fila desde el catálogo (sin tocar la base operacional).
+        Result = ResultEnricher.Enrich(Result, Catalog, OriginColumn);
         Msg = $"{Result.Rows.Count} filas en {Result.ExecutionTime.TotalMilliseconds:F0} ms";
         if (deviceIds is { Count: 0 })
             Msg += $" — sin equipos que cumplan el filtro (0 de {Catalog.Count} del catálogo), por eso no hay datos";
