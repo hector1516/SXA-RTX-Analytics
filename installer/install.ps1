@@ -39,6 +39,7 @@ if (Test-IsIIS) {
   New-Website -Name "SXA-RTX-Analytics" -PhysicalPath $InstallPath -ApplicationPool "SXA-RTX-Analytics" -Port 5000 -Force | Out-Null
   Write-Host "Sitio IIS http://localhost:5000 creado. Configura HTTPS y ConnectionStrings__ConfigurationDatabase como variable del AppPool."
   iisreset /noforce
+  $Mode = "IIS"
 } else {
   Write-Host "IIS no detectado - instalando como Windows Service en http://localhost:5000"
   $exe = Join-Path $InstallPath "SXA.RTX.Analytics.Web.exe"
@@ -49,6 +50,17 @@ if (Test-IsIIS) {
   Write-Host "Servicio iniciado. Abre http://localhost:5000"
   # Abrir firewall
   netsh advfirewall firewall add rule name="SXA-RTX Analytics" dir=in action=allow protocol=TCP localport=5000 2>$null
+  $Mode = "Service"
+}
+
+# Registra la tarea programada de actualización automática (cada hora).
+$updater = Join-Path $InstallPath "tools\update-analytics.ps1"
+if (Test-Path $updater) {
+  schtasks /Create /TN "SXA-RTX-Analytics-Updater" /SC HOURLY /RU SYSTEM /RL HIGHEST /F `
+    /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$updater`" -InstallPath `"$InstallPath`" -Mode $Mode" | Out-Null
+  Write-Host "Tarea de actualización automática registrada (cada hora, modo $Mode)."
+} else {
+  Write-Warning "No se encontró tools\update-analytics.ps1: la actualización automática no quedó programada."
 }
 
 Write-Host "Instalación completada. Usa /configuration para pegar la cadena SQL. Copia este mismo instalador a otro equipo para migrar, y usa Import/Export JSON para llevar la configuración."

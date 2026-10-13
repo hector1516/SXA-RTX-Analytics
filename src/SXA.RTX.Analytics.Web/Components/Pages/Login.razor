@@ -72,9 +72,10 @@
             var success = doc.RootElement.TryGetProperty("success", out var s) && s.GetBoolean();
             if (success)
             {
-                OkMsg = "Acceso concedido — redirigiendo...";
+                var mustChange = doc.RootElement.TryGetProperty("mustChangePassword", out var mc) && mc.GetBoolean();
+                OkMsg = mustChange ? "Debes cambiar tu contraseña antes de continuar..." : "Acceso concedido — redirigiendo...";
                 IsBusy = false;
-                Nav.NavigateTo("/", forceLoad: true);
+                Nav.NavigateTo(mustChange ? "/account/password" : "/", forceLoad: true);
                 return;
             }
             var msg = doc.RootElement.TryGetProperty("message", out var m) ? m.GetString() : "Credenciales inválidas";

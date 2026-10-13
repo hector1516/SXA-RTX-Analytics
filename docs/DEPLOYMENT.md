@@ -82,9 +82,50 @@ Salida en `publish/` (no versionar). Contiene `web.config` generado para IIS.
   defecto, `0` desactiva) y guarda el resultado en memoria; los navegadores solo leen
   `/api/updates/check`, así que el coste no depende del número de usuarios.
 - El administrador ve un modal con el changelog; el resto de usuarios lo ven una vez.
-- **El aviso no instala nada**: el botón abre la página del release. La actualización real es
-  instalar el `.exe` nuevo y reiniciar el App Pool.
 - Intervalo configurable en caliente con la clave `App.UpdateCheckMinutes`.
+
+### Actualización automática
+
+El instalador registra una tarea de Windows (`SXA-RTX-Analytics-Updater`) que ejecuta
+`tools\update-analytics.ps1` **cada hora** y hace, en orden:
+
+1. Compara la versión instalada con el último release de GitHub.
+2. Si hay versión nueva, descarga `SXA-RTX-Analytics-v*-publish.zip`.
+3. Extrae a una carpeta temporal y valida que contenga el ejecutable.
+4. Hace backup de la carpeta actual, detiene el servicio / recicla el App Pool, reemplaza los
+   archivos y reinicia.
+5. Verifica `http://localhost:5000/health/live` → `Healthy`. Si falla, conserva el backup.
+
+Se puede forzar en cualquier momento:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\SXA-RTX Analytics\tools\update-analytics.ps1" `
+  -InstallPath "C:\Program Files\SXA-RTX Analytics" -Mode IIS    # o -Mode Service
+```
+
+> Nota: el reemplazo de archivos lo hace la tarea con permisos de SYSTEM. Si la app corre bajo
+> IIS con una identidad restringida, la tarea sigue funcionando porque detiene el App Pool
+> antes de copiar. Valida el flujo una vez en el servidor antes de dejarlo programado.
+
+## Recuperación de acceso (superadmin)
+
+Si **todos** olvidan su contraseña, se recupera sin tocar la base:
+
+1. Define en el entorno del App Pool / servicio (o en `appsettings.Production.json`):
+
+   | Clave | Valor |
+   | --- | --- |
+   | `BootstrapAdmin__Username` | `ECCSA` (o el que usen) |
+   | `BootstrapAdmin__Password` | una contraseña temporal segura |
+   | `BootstrapAdmin__ResetPassword` | `true` |
+
+2. Reinicia la aplicación (recicla el App Pool o reinicia el servicio).
+3. Entra con ese usuario y contraseña: la app te fuerza a cambiarla antes de continuar.
+4. Retira `BootstrapAdmin__ResetPassword` (o borra la contraseña) para no volver a resetear.
+
+En entornos locales/demo (base InMemory) se crea `ECCSA / Qwe123456` automáticamente. En
+producción con SQL Server real, si no hay administrador activo y no se configura
+`BootstrapAdmin__Password`, la app arranca sin administrador y lo avisa en el log.
 
 ## Health probes
 

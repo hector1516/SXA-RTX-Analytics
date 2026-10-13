@@ -48,6 +48,7 @@ Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 [Files]
 Source: "{#MyPublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "install.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\tools\update-analytics.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "http://localhost:5000"; IconFilename: "{app}\{#MyAppExeName}"

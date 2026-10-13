@@ -118,10 +118,11 @@ app.MapPost("/api/auth/login", async (HttpContext ctx, SXA.RTX.Analytics.Applica
         new(System.Security.Claims.ClaimTypes.Role, res.User.Role.ToString()),
         new("DisplayName", res.User.DisplayName),
     };
+    if (res.MustChangePassword) claims.Add(new("MustChangePassword", "true"));
     var identity = new System.Security.Claims.ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
     var principal = new System.Security.Claims.ClaimsPrincipal(identity);
     await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new Microsoft.AspNetCore.Authentication.AuthenticationProperties { IsPersistent = true, ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8) });
-    return Results.Json(new { success = true });
+    return Results.Json(new { success = true, mustChangePassword = res.MustChangePassword });
 }).DisableAntiforgery();
 
 app.MapRazorComponents<App>()
@@ -136,14 +137,23 @@ try
         if (db.Database.IsRelational()) await db.Database.EnsureCreatedAsync();
         else await db.Database.EnsureCreatedAsync();
 
-        // Seed Administrador ECCSA / Qwe123456 si no existe
-        if (!await db.Set<AppUser>().AnyAsync(x => x.Username == "ECCSA"))
+        // Superadmin: se crea/resetea desde la configuración (nunca en el código).
+        var bootstrap = scope.ServiceProvider.GetRequiredService<SXA.RTX.Analytics.Infrastructure.Services.BootstrapAdminService>();
+        var cfg = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+        var result = await bootstrap.EnsureAsync(
+            cfg["BootstrapAdmin:Username"],
+            cfg["BootstrapAdmin:Password"],
+            cfg["BootstrapAdmin:DisplayName"],
+            string.Equals(cfg["BootstrapAdmin:ResetPassword"], "true", StringComparison.OrdinalIgnoreCase));
+        if (result == "none")
         {
-            var hash = BCrypt.Net.BCrypt.HashPassword("Qwe123456");
-            db.Set<AppUser>().Add(new AppUser { Username = "ECCSA", PasswordHash = hash, DisplayName = "ECCSA", Role = AppRole.Administrador });
-            await db.SaveChangesAsync();
-            Log.Information("Seed usuario ECCSA creado");
+            // InMemory (demo/desarrollo) -> semilla local. SQL Server real en produccion -> exige contraseña.
+            if (!db.Database.IsRelational() || app.Environment.IsDevelopment())
+                await bootstrap.CreateDevDefaultAsync();
+            else
+                Log.Warning("No hay Administrador activo y BootstrapAdmin:Password no está configurado. Define BootstrapAdmin__Password en el entorno para crear o recuperar el superadmin.");
         }
+
         Log.Information("DB ready Provider={Provider} Users={Count}", db.Database.ProviderName, await db.Set<AppUser>().CountAsync());
     }
 }

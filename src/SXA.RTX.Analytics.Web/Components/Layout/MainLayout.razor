@@ -151,9 +151,23 @@
     {
         if (_initialized) return;
         _initialized = true;
+        await EnforcePasswordChange();
         await LoadUpdateInterval();
         await RefreshVersionAndUpdates(initial: true);
         ScheduleNextCheck();
+    }
+
+    // Si la cuenta fue recuperada (superadmin reseteado) obliga a cambiar la contraseña.
+    async Task EnforcePasswordChange()
+    {
+        try
+        {
+            var auth = await AuthState.GetAuthenticationStateAsync();
+            var mustChange = auth.User.HasClaim(c => c.Type == "MustChangePassword" && c.Value == "true");
+            if (mustChange && !Nav.Uri.Contains("/account/password", StringComparison.OrdinalIgnoreCase))
+                Nav.NavigateTo("/account/password", forceLoad: true);
+        }
+        catch { }
     }
 
     async Task RefreshVersionAndUpdates(bool initial)

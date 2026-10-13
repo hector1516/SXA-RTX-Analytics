@@ -17,7 +17,22 @@ public sealed class AuthService : IAuthService
         var user = await _db.Set<AppUser>().FirstOrDefaultAsync(x => x.Username == username, ct);
         if (user is null || !user.IsActive) return new(false, "Usuario no encontrado o inactivo.");
         if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash)) return new(false, "Contraseña incorrecta.");
-        return new(true, "OK", user);
+        return new(true, "OK", user, user.MustChangePassword);
+    }
+
+    public async Task<AuthResult> ChangePasswordAsync(string username, string currentPassword, string newPassword, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 8)
+            return new(false, "La nueva contraseña debe tener al menos 8 caracteres.");
+        var user = await _db.Set<AppUser>().FirstOrDefaultAsync(x => x.Username == username, ct);
+        if (user is null) return new(false, "Usuario no encontrado.");
+        if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash)) return new(false, "La contraseña actual no es correcta.");
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        user.MustChangePassword = false;
+        user.UpdatedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("Contraseña cambiada para {Username}", username);
+        return new(true, "Contraseña actualizada.", user);
     }
 
     public async Task<AppUser?> FindByUsernameAsync(string username, CancellationToken ct = default)

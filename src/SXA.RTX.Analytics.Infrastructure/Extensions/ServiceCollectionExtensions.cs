@@ -39,6 +39,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEquipoService, EquipoService>();
         services.AddScoped<ITablasConfigService, TablasConfigService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<BootstrapAdminService>();
         services.AddScoped<IConfigExportService, ConfigExportService>();
         services.AddScoped<IDynamicQueryService, DynamicQueryService>();
         services.AddScoped<IExportService, ExportService>();
