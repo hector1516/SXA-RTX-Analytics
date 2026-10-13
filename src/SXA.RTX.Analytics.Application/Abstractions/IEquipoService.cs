@@ -30,6 +30,16 @@ public interface IEquipoService
 public interface ITablasConfigService
 {
     Task<IReadOnlyList<string>> ListAllTablesAsync(string? sqlConnectionString, CancellationToken ct = default);
-    Task<IReadOnlyList<(string TableName, EquipoTipo Tipo)>> GetConfigAsync(CancellationToken ct = default);
-    Task<(bool Success, string Message)> SaveAsync(IReadOnlyList<(string TableName, EquipoTipo Tipo)> selections, CancellationToken ct = default);
+    Task<IReadOnlyList<TablaConfigDto>> GetConfigAsync(CancellationToken ct = default);
+    Task<(bool Success, string Message)> SaveAsync(IReadOnlyList<TablaConfigDto> selections, CancellationToken ct = default);
 }
+
+/// <summary>
+/// Configuración visual de una tabla operacional: Tipo (VTI/VTech), título amigable
+/// (DisplayName; null = mostrar el nombre SQL) y columnas visibles (vacío = todas).
+/// </summary>
+public sealed record TablaConfigDto(
+    string TableName,
+    EquipoTipo Tipo,
+    string? DisplayName,
+    IReadOnlyList<string> VisibleColumns);

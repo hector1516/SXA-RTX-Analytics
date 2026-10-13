@@ -26,5 +26,21 @@ public sealed class TablaConfigConfiguration : IEntityTypeConfiguration<TablaCon
         b.HasKey(x => x.Id);
         b.HasIndex(x => x.TableName).IsUnique();
         b.Property(x => x.TableName).HasMaxLength(260).IsRequired();
+        b.Property(x => x.DisplayName).HasMaxLength(200);
+        b.HasMany(x => x.Columnas)
+            .WithOne()
+            .HasForeignKey(x => x.TablaConfigId)
+            .OnDelete(DeleteBehavior.ClientCascade);
+    }
+}
+
+public sealed class TablaColumnaConfiguration : IEntityTypeConfiguration<TablaColumna>
+{
+    public void Configure(EntityTypeBuilder<TablaColumna> b)
+    {
+        b.ToTable("SXA_RTX_TablaColumnas");
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => new { x.TablaConfigId, x.ColumnName }).IsUnique();
+        b.Property(x => x.ColumnName).HasMaxLength(200).IsRequired();
     }
 }

@@ -103,19 +103,61 @@ public sealed class TablasConfigService : ITablasConfigService
         return new List<string> { "[dbo].[SXA_RTX_ApplicationSettings]", "[dbo].[SXA_RTX_AuditLogs]", "[dbo].[Registros]", "[dbo].[VTi_SmartStation_Log]", "[dbo].[VTech_Charging_Log]" };
     }
 
-    public async Task<IReadOnlyList<(string TableName, EquipoTipo Tipo)>> GetConfigAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<TablaConfigDto>> GetConfigAsync(CancellationToken ct = default)
     {
-        var all = await _db.Set<TablaConfig>().AsNoTracking().ToListAsync(ct);
-        return all.Select(x => (x.TableName, (EquipoTipo)x.Tipo)).ToList();
+        var all = await _db.Set<TablaConfig>().AsNoTracking()
+            .Include(x => x.Columnas)
+            .ToListAsync(ct);
+        return all
+            .OrderBy(x => x.TableName, StringComparer.OrdinalIgnoreCase)
+            .Select(x => new TablaConfigDto(
+                x.TableName,
+                (EquipoTipo)x.Tipo,
+                string.IsNullOrWhiteSpace(x.DisplayName) ? null : x.DisplayName,
+                x.Columnas.Select(c => c.ColumnName).OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList()))
+            .ToList();
     }
 
-    public async Task<(bool Success, string Message)> SaveAsync(IReadOnlyList<(string TableName, EquipoTipo Tipo)> selections, CancellationToken ct = default)
+    public async Task<(bool Success, string Message)> SaveAsync(IReadOnlyList<TablaConfigDto> selections, CancellationToken ct = default)
     {
-        var existing = await _db.Set<TablaConfig>().ToListAsync(ct);
-        _db.Set<TablaConfig>().RemoveRange(existing);
-        foreach (var (t, tipo) in selections)
-            _db.Set<TablaConfig>().Add(new TablaConfig { TableName = t, Tipo = (int)tipo });
-        await _db.SaveChangesAsync(ct);
-        return (true, $"{selections.Count} tablas guardadas.");
+        try
+        {
+            var incoming = selections
+                .Where(s => !string.IsNullOrWhiteSpace(s.TableName))
+                .GroupBy(s => s.TableName, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList();
+
+            // Reemplazo completo (borrar y reinsertar): determinista y sin dependencias de
+            // rastreo de hijos, que el proveedor InMemory maneja de forma ambigua.
+            var oldColumns = await _db.Set<TablaColumna>().ToListAsync(ct);
+            if (oldColumns.Count > 0) _db.Set<TablaColumna>().RemoveRange(oldColumns);
+            var oldTables = await _db.Set<TablaConfig>().ToListAsync(ct);
+            if (oldTables.Count > 0) _db.Set<TablaConfig>().RemoveRange(oldTables);
+            await _db.SaveChangesAsync(ct);
+
+            foreach (var sel in incoming)
+            {
+                var row = new TablaConfig
+                {
+                    TableName = sel.TableName,
+                    Tipo = (int)sel.Tipo,
+                    DisplayName = string.IsNullOrWhiteSpace(sel.DisplayName) ? null : sel.DisplayName.Trim(),
+                };
+                foreach (var col in (sel.VisibleColumns ?? Array.Empty<string>())
+                             .Where(c => !string.IsNullOrWhiteSpace(c))
+                             .Distinct(StringComparer.OrdinalIgnoreCase))
+                    row.Columnas.Add(new TablaColumna { ColumnName = col.Trim() });
+                _db.Set<TablaConfig>().Add(row);
+            }
+
+            await _db.SaveChangesAsync(ct);
+            return (true, $"{incoming.Count} tablas guardadas.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error guardando tablas VTI/VTech");
+            return (false, "No se pudo guardar: " + ex.Message);
+        }
     }
 }

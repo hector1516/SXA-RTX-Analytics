@@ -43,7 +43,7 @@
                 <label class="form-label small fw-bold">Tabla</label>
                 <select class="form-select form-select-sm" @bind="SelectedTable" @bind:after="OnTableChanged">
                     <option value="">— selecciona —</option>
-                    @foreach (var t in TablasFiltradas) { <option value="@t">@t</option> }
+                    @foreach (var t in TablasFiltradas) { <option value="@t">@DisplayTable(t)</option> }
                 </select>
                 <div class="form-text"><a href="#" @onclick:preventDefault="true" @onclick="LoadTablas">Recargar tablas</a> (@TablasFiltradas.Count) — usa la conexión de <code>/configuration</code></div>
             </div>
@@ -127,12 +127,19 @@
     List<string> AllTablas = new();
     List<string> TablasFiltradas => string.IsNullOrEmpty(FiltroTipo) ? AllTablas : AllTablas.Where(t => {
         var sel = SelectedConfig.FirstOrDefault(x=>x.TableName==t);
-        if (sel.TableName==null) return false;
+        if (sel?.TableName is null) return false;
         return sel.Tipo.ToString()==FiltroTipo;
     }).ToList();
-    List<(string TableName, EquipoTipo Tipo)> SelectedConfig = new();
+    List<TablaConfigDto> SelectedConfig = new();
     List<ColumnInfo> Columns = new();
     HashSet<string> SelectedColumns = new();
+
+    // Título amigable configurado en /configuration; si no hay, el nombre SQL.
+    string DisplayTable(string tableName)
+    {
+        var sel = SelectedConfig.FirstOrDefault(x => string.Equals(x.TableName, tableName, StringComparison.OrdinalIgnoreCase));
+        return string.IsNullOrWhiteSpace(sel?.DisplayName) ? tableName : sel.DisplayName;
+    }
     string FiltroArea = ""; string FiltroDevice = ""; DateTime? FiltroFrom, FiltroTo; string DateColumn = ""; int MaxRows = 500;
     List<CatalogDeviceDto> Catalog = new(); List<string> Areas = new();
     QueryResult? Result; bool IsRunning; string? Msg; bool Ok;
@@ -155,13 +162,18 @@
     async Task LoadTablas(){
         var list = await TablasService.ListAllTablesAsync(ConnStr);
         AllTablas = list.ToList();
-        SelectedConfig = (await TablasService.GetConfigAsync()).Select(x=>(x.TableName, x.Tipo)).ToList();
+        SelectedConfig = (await TablasService.GetConfigAsync()).ToList();
         if (!string.IsNullOrEmpty(SelectedTable) && !AllTablas.Contains(SelectedTable)) SelectedTable="";
     }
     async Task OnTableChanged(){
         if (string.IsNullOrEmpty(SelectedTable)) { Columns.Clear(); return; }
         Columns = (await QueryService.GetColumnsAsync(ConnStr, SelectedTable)).ToList();
-        SelectedColumns = new HashSet<string>(Columns.Select(c=>c.Name));
+        // Si el admin definió columnas visibles para esta tabla, se preseleccionan solo esas.
+        var cfg = SelectedConfig.FirstOrDefault(x => string.Equals(x.TableName, SelectedTable, StringComparison.OrdinalIgnoreCase));
+        if (cfg is not null && cfg.VisibleColumns.Count > 0)
+            SelectedColumns = new HashSet<string>(cfg.VisibleColumns.Where(w => Columns.Any(c => string.Equals(c.Name, w, StringComparison.OrdinalIgnoreCase))), StringComparer.OrdinalIgnoreCase);
+        else
+            SelectedColumns = new HashSet<string>(Columns.Select(c=>c.Name));
         var dateCol = Columns.FirstOrDefault(c=>c.DataType.Contains("date", StringComparison.OrdinalIgnoreCase)||c.Name.Contains("fecha", StringComparison.OrdinalIgnoreCase));
         DateColumn = dateCol?.Name ?? "";
     }

@@ -20,4 +20,16 @@ public sealed class TablaConfig : BaseEntity
 {
     public required string TableName { get; set; } // schema.table
     public int Tipo { get; set; } // 1=VTI 2=VTech
+    public string? DisplayName { get; set; } // título amigable mostrado al usuario; null = mostrar TableName
+    public ICollection<TablaColumna> Columnas { get; set; } = new List<TablaColumna>();
+}
+
+/// <summary>
+/// Columnas visibles de una tabla operacional. Vacío = mostrar todas.
+/// Solo afecta a la visualización de /query; no cambia el esquema ni los datos.
+/// </summary>
+public sealed class TablaColumna : BaseEntity
+{
+    public Guid TablaConfigId { get; set; }
+    public required string ColumnName { get; set; }
 }

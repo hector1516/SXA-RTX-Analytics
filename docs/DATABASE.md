@@ -87,6 +87,18 @@ Claves con significado propio:
 | Id | uniqueidentifier PK | |
 | TableName | nvarchar(260) UNIQUE | `schema.table` de la base operacional |
 | Tipo | int | 1 = VTI, 2 = VTech |
+| DisplayName | nvarchar(200) NULL | Título amigable mostrado al usuario; NULL = mostrar TableName |
+
+### SXA_RTX_TablaColumnas
+| Col | Tipo | Notas |
+|-----|------|-------|
+| Id | uniqueidentifier PK | |
+| TablaConfigId | uniqueidentifier FK | A `SXA_RTX_TablasConfig`, borrado en cascada |
+| ColumnName | nvarchar(200) | Columna visible en `/query` |
+
+Si una tabla no tiene filas en `SXA_RTX_TablaColumnas`, `/query` muestra todas sus
+columnas. Si tiene, muestra solo las listadas. Es configuración **visual**: no cambia el
+esquema ni los datos de la base operacional.
 
 ### SXA_RTX_Users
 | Col | Tipo | Notas |

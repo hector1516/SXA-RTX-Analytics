@@ -35,8 +35,16 @@ public sealed class ConfigExportService : IConfigExportService
             .Select(e => new { e.DeviceId, e.Nombre, e.Area, e.Tipo, e.Descripcion, e.IsActive })
             .ToListAsync(ct);
         var tablas = await _db.Set<TablaConfig>().AsNoTracking()
-            .Select(t => new { t.TableName, t.Tipo })
+            .Include(t => t.Columnas)
+            .OrderBy(t => t.TableName)
             .ToListAsync(ct);
+        var tablasDto = tablas.Select(t => new
+        {
+            t.TableName,
+            t.Tipo,
+            t.DisplayName,
+            Columnas = t.Columnas.Select(c => c.ColumnName).OrderBy(n => n).ToList(),
+        }).ToList();
         var usuarios = await _db.Set<AppUser>().AsNoTracking()
             .Select(u => new { u.Username, u.DisplayName, u.Role, u.IsActive, u.CreatedAtUtc })
             .ToListAsync(ct);
@@ -51,7 +59,7 @@ public sealed class ConfigExportService : IConfigExportService
                 .Select(s => new { s.Key, s.Value, s.Description, s.Category }).ToList(),
             OmittedSecrets = settings.Count(s => s.IsEncrypted),
             Equipos = equipos,
-            TablasConfig = tablas,
+            TablasConfig = tablasDto,
             // Sin PasswordHash a propósito.
             Users = usuarios,
         };
@@ -101,17 +109,23 @@ public sealed class ConfigExportService : IConfigExportService
 
             if (root.TryGetProperty("TablasConfig", out var tablasEl) && tablasEl.ValueKind == JsonValueKind.Array)
             {
-                var actuales = await _db.Set<TablaConfig>().ToListAsync(ct);
+                var actuales = await _db.Set<TablaConfig>().Include(x => x.Columnas).ToListAsync(ct);
                 _db.Set<TablaConfig>().RemoveRange(actuales);
                 foreach (var el in tablasEl.EnumerateArray())
                 {
                     var tableName = el.TryGetProperty("TableName", out var tn) ? tn.GetString() : null;
                     if (string.IsNullOrWhiteSpace(tableName)) continue;
-                    _db.Set<TablaConfig>().Add(new TablaConfig
+                    var cfg = new TablaConfig
                     {
                         TableName = tableName,
-                        Tipo = el.TryGetProperty("Tipo", out var t) && t.ValueKind == JsonValueKind.Number ? t.GetInt32() : 1
-                    });
+                        Tipo = el.TryGetProperty("Tipo", out var t) && t.ValueKind == JsonValueKind.Number ? t.GetInt32() : 1,
+                        DisplayName = el.TryGetProperty("DisplayName", out var dn) && dn.ValueKind == JsonValueKind.String ? dn.GetString() : null,
+                    };
+                    if (el.TryGetProperty("Columnas", out var colEl) && colEl.ValueKind == JsonValueKind.Array)
+                        foreach (var c in colEl.EnumerateArray())
+                            if (c.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(c.GetString()))
+                                cfg.Columnas.Add(new TablaColumna { ColumnName = c.GetString()! });
+                    _db.Set<TablaConfig>().Add(cfg);
                     tablas++;
                 }
             }

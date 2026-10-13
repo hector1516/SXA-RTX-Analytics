@@ -6,6 +6,7 @@
 @inject ISystemTableService SystemService
 @inject IEquipoService EquipoService
 @inject ITablasConfigService TablasService
+@inject IDynamicQueryService QueryService
 @inject IConfigExportService ExportService
 @inject IDataSourceService DataSources
 @inject IConfigurationService Settings
@@ -184,14 +185,48 @@ else if (ActiveTab == 4)
             @if (AllTables.Count == 0) { <div class="text-muted small">Pulsa “Cargar tablas” (usa la cadena SQL de la pestaña SQL Server).</div> }
             else
             {
-                <div class="table-responsive"><table class="table table-sm small"><thead><tr><th>Tabla</th><th class="text-center">VTI</th><th class="text-center">VTech</th></tr></thead><tbody>
+                <p class="text-muted small">Marca el tipo de cada tabla, ponle un título amigable (lo que verán los usuarios en vez del nombre SQL) y, si quieres, limita las columnas visibles. Vacío en “columnas” = mostrar todas.</p>
+                <div class="table-responsive"><table class="table table-sm small align-middle"><thead><tr><th style="width:34%">Tabla SQL</th><th style="width:30%">Título amigable</th><th class="text-center">VTI</th><th class="text-center">VTech</th><th class="text-center">Columnas</th></tr></thead><tbody>
                     @foreach (var t in AllTables)
                     {
+                        var hasVisible = TableVisible.TryGetValue(t, out var visSet) && visSet.Count > 0;
                         <tr>
-                            <td class="font-monospace">@t</td>
+                            <td class="font-monospace" style="word-break:break-all">@t</td>
+                            <td><input class="form-control form-control-sm" value="@GetTitle(t)" placeholder="@t" @onchange="e => SetTitle(t, (e.Value ?? string.Empty).ToString())" /></td>
                             <td class="text-center"><input type="checkbox" checked="@IsTableSelected(t, EquipoTipo.VTI)" @onchange="e => ToggleTabla(t, EquipoTipo.VTI, (bool)(e.Value ?? false))" /></td>
                             <td class="text-center"><input type="checkbox" checked="@IsTableSelected(t, EquipoTipo.VTech)" @onchange="e => ToggleTabla(t, EquipoTipo.VTech, (bool)(e.Value ?? false))" /></td>
+                            <td class="text-center">
+                                <button class="btn btn-sm @(hasVisible ? "btn-primary" : "btn-outline-secondary")" @onclick="() => LoadColumns(t)">
+                                    @if (LoadingColumns.Contains(t)) { <span class="spinner-border spinner-border-sm"></span> }
+                                    else if (TableColumns.ContainsKey(t)) { @(hasVisible ? $"{visSet!.Count}/{TableColumns[t].Count}" : "Todas") }
+                                    else { @("Columnas") }
+                                </button>
+                            </td>
                         </tr>
+                        @if (TableColumns.TryGetValue(t, out var cols))
+                        {
+                            <tr class="bg-light">
+                                <td colspan="5" class="py-2">
+                                    <div class="d-flex flex-wrap gap-2">
+                                        @foreach (var c in cols)
+                                        {
+                                            <label class="d-flex align-items-center gap-1 border rounded-3 px-2 py-1 bg-white">
+                                                <input type="checkbox" checked="@IsColVisible(t, c.Name)" @onchange="e => ToggleVisibleCol(t, c.Name, (bool)(e.Value ?? false))" />
+                                                @c.Name <span class="text-muted" style="font-size:.65rem">(@c.DataType)</span>
+                                            </label>
+                                        }
+                                    </div>
+                                    @if (hasVisible)
+                                    {
+                                        <button class="btn btn-link btn-sm p-0 mt-1" @onclick="() => TableVisible.Remove(t)">↩ Ver todas las columnas</button>
+                                    }
+                                    else
+                                    {
+                                        <div class="form-text mb-0">Sin marcar = se muestran todas.</div>
+                                    }
+                                </td>
+                            </tr>
+                        }
                     }
                 </tbody></table></div>
                 <div class="text-muted small">Seleccionadas: VTI @SelectedCount(EquipoTipo.VTI) / VTech @SelectedCount(EquipoTipo.VTech)</div>
@@ -242,6 +277,10 @@ else if (ActiveTab == 5)
 
     // Tablas VTI/VTech
     List<string> AllTables = new(); HashSet<(string, EquipoTipo)> Selected = new(); bool IsLoadingTablas = false; bool IsSavingTablas = false; string? TablasMsg; bool TablasOk = false;
+    Dictionary<string, string> TableTitles = new(StringComparer.OrdinalIgnoreCase);
+    Dictionary<string, List<ColumnInfo>> TableColumns = new(StringComparer.OrdinalIgnoreCase);
+    Dictionary<string, HashSet<string>> TableVisible = new(StringComparer.OrdinalIgnoreCase);
+    HashSet<string> LoadingColumns = new(StringComparer.OrdinalIgnoreCase);
 
     // Import/Export
     bool IsExporting = false; bool IsImporting = false; string? ImportExportMsg; bool ImportExportOk = false; string? ExportPreview;
@@ -324,11 +363,42 @@ else if (ActiveTab == 5)
     IEnumerable<EquipoDto> GetEquiposByTipo(string tipo, bool conNombre){ var filtered = Equipos.Where(e=> (e.TipoSync?.ToString()??"")==tipo); return conNombre ? filtered : Enumerable.Empty<EquipoDto>(); }
     IEnumerable<CatalogDeviceDto> GetCatalogByTipo(string tipo, bool _con){ var eqSet = Equipos.Select(e=>e.DeviceId).ToHashSet(); return Catalog.Where(c=> (c.TipoMaquina??"")==tipo && !eqSet.Contains(c.DeviceId)); }
 
-    async Task LoadTablas(){ IsLoadingTablas=true; try { AllTables=(await TablasService.ListAllTablesAsync(BuildSqlConnectionStringReal())).ToList(); var cfg=await TablasService.GetConfigAsync(); Selected=new HashSet<(string, EquipoTipo)>(cfg.Select(x=>(x.TableName, x.Tipo))); } finally { IsLoadingTablas=false; } }
+    async Task LoadTablas(){ IsLoadingTablas=true; try {
+        AllTables=(await TablasService.ListAllTablesAsync(BuildSqlConnectionStringReal())).ToList();
+        var cfg=await TablasService.GetConfigAsync();
+        Selected=new HashSet<(string, EquipoTipo)>(cfg.Select(x=>(x.TableName, x.Tipo)));
+        TableTitles = cfg.Where(x=>!string.IsNullOrWhiteSpace(x.DisplayName)).ToDictionary(x=>x.TableName, x=>x.DisplayName!, StringComparer.OrdinalIgnoreCase);
+        TableVisible = cfg.Where(x=>x.VisibleColumns.Count>0).ToDictionary(x=>x.TableName, x=>new HashSet<string>(x.VisibleColumns, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+    } finally { IsLoadingTablas=false; } }
     bool IsTableSelected(string t, EquipoTipo tipo)=> Selected.Contains((t,tipo));
     void ToggleTabla(string t, EquipoTipo tipo, bool isChecked){ if(isChecked) Selected.Add((t,tipo)); else Selected.Remove((t,tipo)); }
     int SelectedCount(EquipoTipo tipo)=> Selected.Count(x=>x.Item2==tipo);
-    async Task SaveTablas(){ IsSavingTablas=true; var (ok,msg)=await TablasService.SaveAsync(Selected.Select(x=>(x.Item1,x.Item2)).ToList()); TablasOk=ok; TablasMsg=msg; IsSavingTablas=false; }
+    string GetTitle(string t) => TableTitles.TryGetValue(t, out var v) ? v : "";
+    void SetTitle(string t, string v){ if(string.IsNullOrWhiteSpace(v)) TableTitles.Remove(t); else TableTitles[t]=v; }
+    async Task LoadColumns(string t){
+        if (TableColumns.ContainsKey(t)) return;
+        LoadingColumns.Add(t);
+        try { var cols = await QueryService.GetColumnsAsync(BuildSqlConnectionStringReal(), t); TableColumns[t] = cols.ToList(); }
+        finally { LoadingColumns.Remove(t); }
+    }
+    bool IsColVisible(string t, string col) => TableVisible.TryGetValue(t, out var set) ? set.Contains(col) : false;
+    void ToggleVisibleCol(string t, string col, bool on){
+        if (!TableVisible.TryGetValue(t, out var set)) { set = new HashSet<string>(StringComparer.OrdinalIgnoreCase); TableVisible[t]=set; }
+        if(on) set.Add(col); else set.Remove(col);
+    }
+    async Task SaveTablas(){
+        IsSavingTablas=true; TablasMsg=null;
+        try {
+            var dtos = Selected.Select(s => new TablaConfigDto(
+                s.Item1, s.Item2,
+                TableTitles.TryGetValue(s.Item1, out var title) ? title : null,
+                TableVisible.TryGetValue(s.Item1, out var cols) ? cols.ToList() : new List<string>())
+            ).ToList();
+            var (ok,msg)=await TablasService.SaveAsync(dtos);
+            TablasOk=ok; TablasMsg=msg;
+        } catch(Exception ex){ TablasOk=false; TablasMsg="No se pudo guardar: "+ex.Message; }
+        finally { IsSavingTablas=false; }
+    }
 
     async Task Exportar(){
         IsExporting=true; ImportExportMsg=null;
