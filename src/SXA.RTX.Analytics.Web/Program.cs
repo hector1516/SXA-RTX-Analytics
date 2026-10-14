@@ -128,9 +128,9 @@ app.MapPost("/api/auth/login", async (HttpContext ctx, SXA.RTX.Analytics.Applica
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
+Log.Information("Starting SXA-RTX Analytics Web (Environment={Environment})", app.Environment.EnvironmentName);
 try
 {
-    Log.Information("Starting SXA-RTX Analytics Web (Environment={Environment})", app.Environment.EnvironmentName);
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<ConfigurationDbContext>();
@@ -159,7 +159,12 @@ try
         Log.Information("DB ready Provider={Provider} Users={Count}", db.Database.ProviderName, await db.Set<AppUser>().CountAsync());
     }
 }
-catch (Exception ex) { Log.Fatal(ex, "Startup failed"); throw; }
+catch (Exception ex)
+{
+    // Si la base no está accesible, la app igual arranca (modo degradado) para poder
+    // revisar la configuración; las páginas que consultan datos mostrarán su error.
+    Log.Error(ex, "No se pudo inicializar la base de datos; la aplicación arranca en modo degradado. Revisa la cadena de conexión y los permisos.");
+}
 
 app.Lifetime.ApplicationStarted.Register(() => Log.Information("SXA-RTX Analytics started successfully"));
 app.Lifetime.ApplicationStopping.Register(() => Log.Information("SXA-RTX Analytics stopping"));

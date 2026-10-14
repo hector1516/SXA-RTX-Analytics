@@ -20,14 +20,7 @@
         <p class="text-muted small mb-0">Elige tabla (filtrada por <code>SXA_RTX_TablasConfig VTI/VTech</code>), columnas y filtros.</p>
     </div>
     <div class="d-flex gap-2 align-items-center">
-        @if (!UsesOperationalSource)
-        {
-            <span class="rtx-pill rtx-pill--honey" title="No hay base operacional configurada: se consulta la base de configuración">Base de configuración</span>
-        }
-        else
-        {
-            <span class="rtx-pill rtx-pill--mint" title="Origen de datos operacional configurado en /configuration">@(string.IsNullOrWhiteSpace(OperationalSourceName) ? "Base operacional" : OperationalSourceName)</span>
-        }
+        <span class="rtx-pill">SQL Server</span>
         <a href="/configuration" class="btn btn-sm btn-outline-secondary">Configurar</a>
     </div>
 </div>
