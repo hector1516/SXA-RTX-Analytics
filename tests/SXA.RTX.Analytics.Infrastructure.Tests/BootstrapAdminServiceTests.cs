@@ -9,15 +9,18 @@ namespace SXA.RTX.Analytics.Infrastructure.Tests;
 public class BootstrapAdminServiceTests : InfrastructureTestBase
 {
     [Fact]
-    public async Task Sin_administrador_y_sin_password_devuelve_none()
+    public async Task Sin_administrador_crea_el_superadmin_por_defecto()
     {
-        await using var db = NewDb(nameof(Sin_administrador_y_sin_password_devuelve_none));
+        await using var db = NewDb(nameof(Sin_administrador_crea_el_superadmin_por_defecto));
         var sut = new BootstrapAdminService(db, NullLogger<BootstrapAdminService>.Instance);
 
-        var r = await sut.EnsureAsync("ECCSA", "", "ECCSA", resetPassword: false);
+        var r = await sut.EnsureAsync("ECCSA", "", "ECCSA", resetPassword: false, defaultPassword: "Qwe123456");
 
-        Assert.Equal("none", r);
-        Assert.Empty(await db.Set<AppUser>().ToListAsync());
+        Assert.Equal("created", r);
+        var user = await db.Set<AppUser>().SingleAsync();
+        Assert.Equal(AppRole.Administrador, user.Role);
+        Assert.False(user.MustChangePassword);
+        Assert.True(BCrypt.Net.BCrypt.Verify("Qwe123456", user.PasswordHash));
     }
 
     [Fact]
@@ -26,12 +29,11 @@ public class BootstrapAdminServiceTests : InfrastructureTestBase
         await using var db = NewDb(nameof(Crea_el_superadmin_cuando_no_hay_administrador_y_hay_password));
         var sut = new BootstrapAdminService(db, NullLogger<BootstrapAdminService>.Instance);
 
-        var r = await sut.EnsureAsync("ECCSA", "Temp#123456", "ECCSA", resetPassword: false);
+        var r = await sut.EnsureAsync("ECCSA", "Temp#123456", "ECCSA", resetPassword: false, defaultPassword: "Qwe123456");
 
         Assert.Equal("created", r);
         var user = await db.Set<AppUser>().SingleAsync();
         Assert.Equal(AppRole.Administrador, user.Role);
-        Assert.True(user.MustChangePassword);
         Assert.True(BCrypt.Net.BCrypt.Verify("Temp#123456", user.PasswordHash));
     }
 
@@ -47,7 +49,7 @@ public class BootstrapAdminServiceTests : InfrastructureTestBase
         await db.SaveChangesAsync();
         var sut = new BootstrapAdminService(db, NullLogger<BootstrapAdminService>.Instance);
 
-        var r = await sut.EnsureAsync("ECCSA", "Temp#123456", "ECCSA", resetPassword: false);
+        var r = await sut.EnsureAsync("ECCSA", "Temp#123456", "ECCSA", resetPassword: false, defaultPassword: "Qwe123456");
 
         Assert.Equal("ok", r);
         Assert.Single(await db.Set<AppUser>().ToListAsync());
@@ -65,7 +67,7 @@ public class BootstrapAdminServiceTests : InfrastructureTestBase
         await db.SaveChangesAsync();
         var sut = new BootstrapAdminService(db, NullLogger<BootstrapAdminService>.Instance);
 
-        var r = await sut.EnsureAsync("ECCSA", "Nueva#123456", "ECCSA", resetPassword: true);
+        var r = await sut.EnsureAsync("ECCSA", "Nueva#123456", "ECCSA", resetPassword: true, defaultPassword: "Qwe123456");
 
         Assert.Equal("reset", r);
         var user = await db.Set<AppUser>().SingleAsync();
@@ -80,7 +82,7 @@ public class BootstrapAdminServiceTests : InfrastructureTestBase
         await using var db = NewDb(nameof(Reset_con_username_inexistente_lo_crea));
         var sut = new BootstrapAdminService(db, NullLogger<BootstrapAdminService>.Instance);
 
-        var r = await sut.EnsureAsync("superadmin", "Temp#123456", "Super Admin", resetPassword: true);
+        var r = await sut.EnsureAsync("superadmin", "Temp#123456", "Super Admin", resetPassword: true, defaultPassword: "Qwe123456");
 
         Assert.Equal("reset", r);
         var user = await db.Set<AppUser>().SingleAsync();

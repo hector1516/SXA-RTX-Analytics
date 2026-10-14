@@ -30,15 +30,15 @@ public sealed class BootstrapAdminService
     /// <summary>
     /// Devuelve:
     ///   "reset"   -> se reseteó la contraseña del superadmin (debe cambiarla al entrar).
-    ///   "created" -> se creó el superadmin (debe cambiar la contraseña al entrar).
+    ///   "created" -> se creó el superadmin por defecto (primer arranque sin administradores).
     ///   "ok"      -> ya existe al menos un Administrador activo y no se pidió reset.
-    ///   "none"    -> no hay administrador y no se proporcionó contraseña (lo decide el llamador).
     /// </summary>
     public async Task<string> EnsureAsync(
         string? username,
         string? password,
         string? displayName,
         bool resetPassword,
+        string? defaultPassword,
         CancellationToken ct = default)
     {
         var name = string.IsNullOrWhiteSpace(username) ? "ECCSA" : username.Trim();
@@ -69,36 +69,19 @@ public sealed class BootstrapAdminService
             .AnyAsync(x => x.Role == AppRole.Administrador && x.IsActive, ct);
         if (hasActiveAdmin) return "ok";
 
-        if (!string.IsNullOrWhiteSpace(password))
-        {
-            _db.Set<AppUser>().Add(new AppUser
-            {
-                Username = name,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
-                DisplayName = display,
-                Role = AppRole.Administrador,
-                MustChangePassword = true,
-            });
-            await _db.SaveChangesAsync(ct);
-            _logger.LogInformation("BootstrapAdmin: superadmin '{Username}' creado (debe cambiar la contraseña al entrar)", name);
-            return "created";
-        }
-
-        return "none";
-    }
-
-    /// <summary>Semilla de desarrollo (solo entorno local): ECCSA / Qwe123456.</summary>
-    public async Task CreateDevDefaultAsync(CancellationToken ct = default)
-    {
-        if (await _db.Set<AppUser>().AnyAsync(x => x.Username == "ECCSA", ct)) return;
+        // Sin administradores: crea el superadmin por defecto (siempre hay una vía de acceso).
+        var initial = !string.IsNullOrWhiteSpace(password) ? password
+            : (!string.IsNullOrWhiteSpace(defaultPassword) ? defaultPassword : "Qwe123456");
         _db.Set<AppUser>().Add(new AppUser
         {
-            Username = "ECCSA",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Qwe123456"),
-            DisplayName = "ECCSA",
+            Username = name,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(initial),
+            DisplayName = display,
             Role = AppRole.Administrador,
+            MustChangePassword = false,
         });
         await _db.SaveChangesAsync(ct);
-        _logger.LogInformation("Seed desarrollo ECCSA creado");
+        _logger.LogInformation("BootstrapAdmin: superadmin por defecto '{Username}' creado", name);
+        return "created";
     }
 }

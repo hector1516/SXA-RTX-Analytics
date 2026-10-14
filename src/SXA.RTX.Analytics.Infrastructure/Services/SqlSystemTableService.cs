@@ -17,34 +17,35 @@ public sealed class SqlSystemTableService : ISystemTableService
     private readonly ILogger<SqlSystemTableService> _logger;
 
     // Tablas del sistema — prefijo SXA_RTX_ para identidad de la app.
-    // Solo estas se permiten crear desde UI (no tablas operacionales).
+    // Esta lista ES la fuente de verdad del esquema de configuración: debe coincidir
+    // con el modelo de EF Core (Configurations). Si en una actualización se agrega una
+    // entidad nueva, se añade aquí su definición y el botón "Crear faltantes" la crea.
     private static readonly IReadOnlyList<SystemTableStatus> Definitions = new List<SystemTableStatus>
     {
         new("SXA_RTX_ApplicationSettings", "dbo", false, "Key-value de configuración editable sin recompilar", CreateApplicationSettings),
-        new("SXA_RTX_AuditLogs", "dbo", false, "Auditoría de acciones (quién/cuándo/qué)"),
-        new("SXA_RTX_Users", "dbo", false, "Usuarios internos de la plataforma"),
-        new("SXA_RTX_Roles", "dbo", false, "Roles y permisos"),
-        new("SXA_RTX_UserRoles", "dbo", false, "Asignación usuario↔rol (M:N)"),
-        new("SXA_RTX_DataSources", "dbo", false, "Catálogo de fuentes (SQL/ODBC) con cadena cifrada"),
+        new("SXA_RTX_AuditLogs", "dbo", false, "Bitácora de acciones (quién/cuándo/qué)", CreateAuditLogs),
+        new("SXA_RTX_Equipos", "dbo", false, "Mapeo DeviceId → Nombre/Área/Tipo", CreateEquipos),
+        new("SXA_RTX_TablasConfig", "dbo", false, "Tablas operativas VTI/VTech + título amigable", CreateTablasConfig),
+        new("SXA_RTX_TablaColumnas", "dbo", false, "Columnas visibles por tabla", CreateTablaColumnas),
+        new("SXA_RTX_Users", "dbo", false, "Usuarios internos de la plataforma", CreateUsers),
     };
 
     private const string CreateApplicationSettings = @"
 IF OBJECT_ID('dbo.SXA_RTX_ApplicationSettings','U') IS NULL
 CREATE TABLE dbo.SXA_RTX_ApplicationSettings(
  Id uniqueidentifier NOT NULL PRIMARY KEY,
- [Key] nvarchar(200) NOT NULL UNIQUE,
+ [Key] nvarchar(200) NOT NULL,
  [Value] nvarchar(4000) NOT NULL,
  [Description] nvarchar(1000) NULL,
- [Category] nvarchar(100) NULL,
+ Category nvarchar(100) NULL,
  IsEncrypted bit NOT NULL DEFAULT 0,
  CreatedAtUtc datetime2 NOT NULL DEFAULT SYSUTCDATETIME(),
  UpdatedAtUtc datetime2 NULL
-);";
+);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_SXA_RTX_ApplicationSettings_Key' AND object_id=OBJECT_ID('dbo.SXA_RTX_ApplicationSettings'))
+CREATE UNIQUE INDEX IX_SXA_RTX_ApplicationSettings_Key ON dbo.SXA_RTX_ApplicationSettings([Key]);";
 
-    private static readonly IReadOnlyDictionary<string,string> CreateSqlByTable = new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase)
-    {
-        ["SXA_RTX_ApplicationSettings"] = CreateApplicationSettings,
-        ["SXA_RTX_AuditLogs"] = @"
+    private const string CreateAuditLogs = @"
 IF OBJECT_ID('dbo.SXA_RTX_AuditLogs','U') IS NULL
 CREATE TABLE dbo.SXA_RTX_AuditLogs(
  Id uniqueidentifier NOT NULL PRIMARY KEY,
@@ -57,46 +58,68 @@ CREATE TABLE dbo.SXA_RTX_AuditLogs(
  IpAddress nvarchar(45) NULL,
  CreatedAtUtc datetime2 NOT NULL DEFAULT SYSUTCDATETIME(),
  UpdatedAtUtc datetime2 NULL
-); CREATE INDEX IX_SXA_RTX_AuditLogs_TimestampUtc ON dbo.SXA_RTX_AuditLogs(TimestampUtc);",
-        ["SXA_RTX_Users"] = @"
+);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_SXA_RTX_AuditLogs_TimestampUtc' AND object_id=OBJECT_ID('dbo.SXA_RTX_AuditLogs'))
+CREATE INDEX IX_SXA_RTX_AuditLogs_TimestampUtc ON dbo.SXA_RTX_AuditLogs(TimestampUtc);";
+
+    private const string CreateEquipos = @"
+IF OBJECT_ID('dbo.SXA_RTX_Equipos','U') IS NULL
+CREATE TABLE dbo.SXA_RTX_Equipos(
+ Id uniqueidentifier NOT NULL PRIMARY KEY,
+ DeviceId nvarchar(64) NOT NULL,
+ Nombre nvarchar(150) NOT NULL,
+ Area nvarchar(100) NOT NULL,
+ Tipo int NOT NULL DEFAULT 0,
+ Descripcion nvarchar(500) NULL,
+ IsActive bit NOT NULL DEFAULT 1,
+ CreatedAtUtc datetime2 NOT NULL DEFAULT SYSUTCDATETIME(),
+ UpdatedAtUtc datetime2 NULL
+);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_SXA_RTX_Equipos_DeviceId' AND object_id=OBJECT_ID('dbo.SXA_RTX_Equipos'))
+CREATE UNIQUE INDEX IX_SXA_RTX_Equipos_DeviceId ON dbo.SXA_RTX_Equipos(DeviceId);";
+
+    private const string CreateTablasConfig = @"
+IF OBJECT_ID('dbo.SXA_RTX_TablasConfig','U') IS NULL
+CREATE TABLE dbo.SXA_RTX_TablasConfig(
+ Id uniqueidentifier NOT NULL PRIMARY KEY,
+ TableName nvarchar(260) NOT NULL,
+ Tipo int NOT NULL,
+ DisplayName nvarchar(200) NULL,
+ CreatedAtUtc datetime2 NOT NULL DEFAULT SYSUTCDATETIME(),
+ UpdatedAtUtc datetime2 NULL
+);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_SXA_RTX_TablasConfig_TableName' AND object_id=OBJECT_ID('dbo.SXA_RTX_TablasConfig'))
+CREATE UNIQUE INDEX IX_SXA_RTX_TablasConfig_TableName ON dbo.SXA_RTX_TablasConfig(TableName);";
+
+    private const string CreateTablaColumnas = @"
+IF OBJECT_ID('dbo.SXA_RTX_TablaColumnas','U') IS NULL
+BEGIN
+CREATE TABLE dbo.SXA_RTX_TablaColumnas(
+ Id uniqueidentifier NOT NULL PRIMARY KEY,
+ TablaConfigId uniqueidentifier NOT NULL,
+ ColumnName nvarchar(200) NOT NULL,
+ CreatedAtUtc datetime2 NOT NULL DEFAULT SYSUTCDATETIME(),
+ UpdatedAtUtc datetime2 NULL
+);
+CREATE UNIQUE INDEX IX_SXA_RTX_TablaColumnas_TablaCol ON dbo.SXA_RTX_TablaColumnas(TablaConfigId, ColumnName);
+ALTER TABLE dbo.SXA_RTX_TablaColumnas ADD CONSTRAINT FK_SXA_RTX_TablaColumnas_TablasConfig FOREIGN KEY (TablaConfigId) REFERENCES dbo.SXA_RTX_TablasConfig(Id) ON DELETE CASCADE;
+END";
+
+    private const string CreateUsers = @"
 IF OBJECT_ID('dbo.SXA_RTX_Users','U') IS NULL
 CREATE TABLE dbo.SXA_RTX_Users(
  Id uniqueidentifier NOT NULL PRIMARY KEY,
- Username nvarchar(100) NOT NULL UNIQUE,
+ Username nvarchar(100) NOT NULL,
+ PasswordHash nvarchar(500) NOT NULL,
  DisplayName nvarchar(200) NOT NULL,
- Email nvarchar(320) NULL,
+ Role int NOT NULL DEFAULT 2,
  IsActive bit NOT NULL DEFAULT 1,
+ MustChangePassword bit NOT NULL DEFAULT 0,
  CreatedAtUtc datetime2 NOT NULL DEFAULT SYSUTCDATETIME(),
  UpdatedAtUtc datetime2 NULL
-);",
-        ["SXA_RTX_Roles"] = @"
-IF OBJECT_ID('dbo.SXA_RTX_Roles','U') IS NULL
-CREATE TABLE dbo.SXA_RTX_Roles(
- Id uniqueidentifier NOT NULL PRIMARY KEY,
- Name nvarchar(100) NOT NULL UNIQUE,
- Description nvarchar(500) NULL,
- CreatedAtUtc datetime2 NOT NULL DEFAULT SYSUTCDATETIME()
-);",
-        ["SXA_RTX_UserRoles"] = @"
-IF OBJECT_ID('dbo.SXA_RTX_UserRoles','U') IS NULL
-CREATE TABLE dbo.SXA_RTX_UserRoles(
- UserId uniqueidentifier NOT NULL REFERENCES dbo.SXA_RTX_Users(Id),
- RoleId uniqueidentifier NOT NULL REFERENCES dbo.SXA_RTX_Roles(Id),
- AssignedAtUtc datetime2 NOT NULL DEFAULT SYSUTCDATETIME(),
- PRIMARY KEY(UserId, RoleId)
-);",
-        ["SXA_RTX_DataSources"] = @"
-IF OBJECT_ID('dbo.SXA_RTX_DataSources','U') IS NULL
-CREATE TABLE dbo.SXA_RTX_DataSources(
- Id uniqueidentifier NOT NULL PRIMARY KEY,
- Name nvarchar(150) NOT NULL UNIQUE,
- Type int NOT NULL, -- 1=SqlServer 2=Odbc
- ConnectionStringEncrypted nvarchar(1000) NOT NULL,
- IsActive bit NOT NULL DEFAULT 1,
- CreatedAtUtc datetime2 NOT NULL DEFAULT SYSUTCDATETIME(),
- UpdatedAtUtc datetime2 NULL
-);",
-    };
+);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_SXA_RTX_Users_Username' AND object_id=OBJECT_ID('dbo.SXA_RTX_Users'))
+CREATE UNIQUE INDEX IX_SXA_RTX_Users_Username ON dbo.SXA_RTX_Users(Username);";
 
     public SqlSystemTableService(ConfigurationDbContext db, IConfiguration config, ILogger<SqlSystemTableService> logger)
     {
@@ -107,10 +130,10 @@ CREATE TABLE dbo.SXA_RTX_DataSources(
 
     public async Task<IReadOnlyList<SystemTableStatus>> GetSystemTablesStatusAsync(CancellationToken ct = default)
     {
-        // InMemory (scaffold sin SQL) → simula que las 2 primeras existen (son las del DbContext)
+        // InMemory (scaffold sin SQL) → simula que todas existen (EnsureCreated las crea en memoria)
         if (!_db.Database.IsRelational() || _db.Database.ProviderName?.Contains("InMemory", StringComparison.OrdinalIgnoreCase) == true)
         {
-            return Definitions.Select((d,i) => d with { Exists = i < 2 }).ToList();
+            return Definitions.Select(d => d with { Exists = true }).ToList();
         }
 
         var result = new List<SystemTableStatus>();
@@ -134,8 +157,10 @@ CREATE TABLE dbo.SXA_RTX_DataSources(
 
     public async Task<(bool Success, string Message)> CreateTableAsync(string tableName, CancellationToken ct = default)
     {
-        if (!CreateSqlByTable.TryGetValue(tableName, out var sql))
+        var def = Definitions.FirstOrDefault(d => string.Equals(d.TableName, tableName, StringComparison.OrdinalIgnoreCase));
+        if (def is null || string.IsNullOrEmpty(def.CreateSql))
             return (false, $"Tabla del sistema no reconocida: {tableName}");
+        var sql = def.CreateSql;
 
         if (!_db.Database.IsRelational() || _db.Database.ProviderName?.Contains("InMemory", StringComparison.OrdinalIgnoreCase) == true)
         {

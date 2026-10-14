@@ -63,4 +63,15 @@ if (Test-Path $updater) {
   Write-Warning "No se encontró tools\update-analytics.ps1: la actualización automática no quedó programada."
 }
 
-Write-Host "Instalación completada. Usa /configuration para pegar la cadena SQL. Copia este mismo instalador a otro equipo para migrar, y usa Import/Export JSON para llevar la configuración."
+# Crea las tablas SXA_RTX_* y el superadmin por defecto (si la cadena SQL ya está configurada).
+# Se ejecuta en cada instalación; es idempotente. Si aún no hay ConnectionStrings__ConfigurationDatabase
+# configurada en el entorno, lo deja pendiente para el primer arranque.
+$webExe = Join-Path $InstallPath "SXA.RTX.Analytics.Web.exe"
+if (Test-Path $webExe) {
+  Write-Host "Verificando tablas del sistema y superadmin (--ensure-db)..."
+  & $webExe --ensure-db --urls http://localhost:5000
+} else {
+  Write-Warning "No se encontró SXA.RTX.Analytics.Web.exe: se omitió --ensure-db."
+}
+
+Write-Host "Instalación completada. Si no configuraste la cadena SQL, hazlo en /configuration -> Guardar conexiones. El superadmin por defecto es ECCSA / Qwe123456 (cámbialo)."

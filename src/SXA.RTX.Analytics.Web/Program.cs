@@ -134,25 +134,27 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<ConfigurationDbContext>();
-        if (db.Database.IsRelational()) await db.Database.EnsureCreatedAsync();
-        else await db.Database.EnsureCreatedAsync();
+        await db.Database.EnsureCreatedAsync();
 
-        // Superadmin: se crea/resetea desde la configuración (nunca en el código).
+        // En SQL Server real (base ya existente), EnsureCreated NO crea tablas faltantes:
+        // se crean aquí las SXA_RTX_* que no existan.
+        if (db.Database.IsRelational())
+        {
+            var tables = scope.ServiceProvider.GetRequiredService<SXA.RTX.Analytics.Application.Abstractions.ISystemTableService>();
+            var (ok, msg) = await tables.CreateAllMissingAsync();
+            if (!ok) Log.Warning("Tablas del sistema: {Msg}", msg);
+        }
+
+        // Superadmin: primer arranque crea el por defecto; ResetPassword permite recuperarlo.
         var bootstrap = scope.ServiceProvider.GetRequiredService<SXA.RTX.Analytics.Infrastructure.Services.BootstrapAdminService>();
         var cfg = scope.ServiceProvider.GetRequiredService<IConfiguration>();
         var result = await bootstrap.EnsureAsync(
             cfg["BootstrapAdmin:Username"],
             cfg["BootstrapAdmin:Password"],
             cfg["BootstrapAdmin:DisplayName"],
-            string.Equals(cfg["BootstrapAdmin:ResetPassword"], "true", StringComparison.OrdinalIgnoreCase));
-        if (result == "none")
-        {
-            // InMemory (demo/desarrollo) -> semilla local. SQL Server real en produccion -> exige contraseña.
-            if (!db.Database.IsRelational() || app.Environment.IsDevelopment())
-                await bootstrap.CreateDevDefaultAsync();
-            else
-                Log.Warning("No hay Administrador activo y BootstrapAdmin:Password no está configurado. Define BootstrapAdmin__Password en el entorno para crear o recuperar el superadmin.");
-        }
+            string.Equals(cfg["BootstrapAdmin:ResetPassword"], "true", StringComparison.OrdinalIgnoreCase),
+            cfg["BootstrapAdmin:DefaultPassword"]);
+        Log.Information("BootstrapAdmin: {Result}", result);
 
         Log.Information("DB ready Provider={Provider} Users={Count}", db.Database.ProviderName, await db.Set<AppUser>().CountAsync());
     }
@@ -161,6 +163,13 @@ catch (Exception ex) { Log.Fatal(ex, "Startup failed"); throw; }
 
 app.Lifetime.ApplicationStarted.Register(() => Log.Information("SXA-RTX Analytics started successfully"));
 app.Lifetime.ApplicationStopping.Register(() => Log.Information("SXA-RTX Analytics stopping"));
+
+// --ensure-db: crea tablas y superadmin, luego termina (lo usa el instalador).
+if (args.Contains("--ensure-db", StringComparer.OrdinalIgnoreCase))
+{
+    Log.Information("ensure-db completado; terminando.");
+    return;
+}
 
 app.Run();
 

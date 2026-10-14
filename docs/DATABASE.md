@@ -118,16 +118,26 @@ conocer las tablas de la plataforma. `Equipo` usa igualdad simple (`OrigenPC = @
 
 ## Tablas del sistema que puede crear la UI
 
-La pestaña *Tablas sistema* de `/configuration` ofrece crear estas tablas si faltan:
+La pestaña *Tablas sistema* de `/configuration` (botón **Crear faltantes**) y el arranque de la
+app crean automáticamente las tablas `SXA_RTX_*` que falten. La lista es la **fuente de verdad**
+del esquema (`SqlSystemTableService.Definitions`): si en una actualización se agrega una entidad,
+se añade aquí su definición y el botón la crea en el servidor.
 
 | Tabla | Notas |
 | --- | --- |
 | `SXA_RTX_ApplicationSettings` | Key-value de configuración |
 | `SXA_RTX_AuditLogs` | Auditoría |
+| `SXA_RTX_Equipos` | Mapeo DeviceId → Nombre/Área/Tipo |
+| `SXA_RTX_TablasConfig` | Tablas operativas VTI/VTech + título amigable |
+| `SXA_RTX_TablaColumnas` | Columnas visibles por tabla |
 | `SXA_RTX_Users` | Usuarios internos |
-| `SXA_RTX_Roles` | Roles y permisos |
-| `SXA_RTX_UserRoles` | Asignación usuario↔rol (M:N) |
-| `SXA_RTX_DataSources` | Catálogo de fuentes con cadena cifrada (reservada) |
+
+> La app **nunca crea ni modifica** las tablas de planta (`VTi_*`, `VTech_*`, `Registros`,
+> `SXA_PCs`, etc.): solo las lee.
+
+> Si `EnsureCreated()` no puede crear las tablas (base ya existente), el arranque llama a
+> `CreateAllMissingAsync()` para crear las faltantes. Si la cuenta de la app no tiene permisos DDL,
+> ejecuta `database/init-hussmann-insight.sql` una vez con una cuenta administrativa.
 
 Los nombres coinciden con los que mapea EF Core, así que crear la tabla desde la UI y dejar que la
 app la use son equivalentes.
