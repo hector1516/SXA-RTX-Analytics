@@ -158,7 +158,10 @@ Bullet "Dos orígenes de datos: base de configuración (catálogo de la app) y b
 Bullet "Consulta dinámica con selección de tabla, columnas, filtros por tipo, área, equipo (DeviceId) y rango de fechas, más gráfico interactivo."
 Bullet "Exportación de resultados a Excel y a PDF."
 Bullet "Usuarios: alta, edición, borrado y activación con hash de contraseña."
-Bullet "Sistema de actualizaciones: consulta a GitHub Releases desde el servidor y aviso al administrador y al resto de usuarios."
+Bullet "Sistema de actualizaciones: consulta a GitHub Releases desde el servidor, aviso al administrador y al resto de usuarios, y actualización automática por tarea programada."
+Bullet "Interfaz minimalista (un solo color de acento e iconos SVG) con tema claro/oscuro y diseño guiado por las guías de Apple (HIG): jerarquía, contraste AA y respeto a 'reducir movimiento'."
+Bullet "Recuperación de acceso: superadmin por defecto y restablecimiento por variable de entorno."
+Bullet "Creación de las tablas propias (SXA_RTX_*) desde la instalación, el arranque o la pestaña Tablas sistema."
 Bullet "Instalador Inno Setup dual (IIS o Windows Service) y publicación automatizada en GitHub Actions."
 Bullet "Health checks en /health (JSON) y /health/live (texto)."
 
@@ -224,17 +227,17 @@ BreakPage
 H1 "4. Módulos funcionales"
 
 H2 "4.1 Inicio"
-P "Tablero de monitoreo con estado de línea de VTI y VTech, última actualización, distribución por tipo, equipos por área, últimos equipos y accesos rápidos."
-Shot "02-home.png" "Figura 2. Inicio: KPIs de VTI/VTech, distribución por tipo y accesos rápidos."
-Shot "03-home-completo.png" "Figura 3. Inicio completo (captura de página completa)."
+P "Tablero con foco en los datos: fila de indicadores (VTI y VTech en línea, equipos y tablas configuradas), gráfico de equipos por área, dona de distribución por tipo, tabla de últimos equipos y tarjeta de resumen."
+Shot "02-home.png" "Figura 2. Panel de operación: indicadores, gráfico por área y distribución por tipo."
+Shot "03-home-completo.png" "Figura 3. Panel completo (captura de página completa)."
 
 H2 "4.2 Configuración"
 P "Seis pestañas. La primera define las dos conexiones SQL (configuración y operacional) y permite guardarlas; la de MAPICS registra la conexión ODBC."
-Shot "04-configuracion-sql.png" "Figura 4. Arriba, base de configuración con el botón Guardar conexiones. Abajo, base operacional (VTI/VTech) que consulta /query. Las contraseñas se cifran con DPAPI y nunca se muestran."
+Shot "04-configuracion-sql.png" "Figura 4. Base de configuración y base operacional (VTI/VTech). Las contraseñas se cifran con DPAPI y nunca se muestran."
 Shot "05-configuracion-mapics.png" "Figura 5. Configuración - conexión MAPICS por ODBC."
-Shot "06-configuracion-tablas-sistema.png" "Figura 6. Configuración - tablas del sistema SXA_RTX_*."
+Shot "06-configuracion-tablas-sistema.png" "Figura 6. Configuración - tablas del sistema SXA_RTX_* con el botón Crear faltantes."
 Shot "07-configuracion-equipos.png" "Figura 7. Configuración - equipos: DeviceId, tipo (de SXA_PCs), nombre y área."
-Shot "08-configuracion-tablas-vti-vtech.png" "Figura 8. Configuración - tablas operativas VTI/VTech."
+Shot "08-configuracion-tablas-vti-vtech.png" "Figura 8. Configuración - tablas operativas VTI/VTech con título amigable y columnas visibles."
 Shot "09-configuracion-importexport.png" "Figura 9. Import/Export en JSON. El export nunca incluye cadenas de conexión ni hashes de contraseña; los usuarios importados quedan inactivos y con contraseña pendiente."
 
 H2 "4.3 Consulta dinámica"
@@ -244,6 +247,15 @@ Shot "11-consulta-resultados.png" "Figura 11. Resultado de la consulta con gráf
 
 H2 "4.4 Usuarios"
 Shot "12-usuarios.png" "Figura 12. Administración de usuarios: alta, edición, borrado y activación."
+
+H2 "4.5 Interfaz y diseño"
+P "La interfaz se rediseñó siguiendo los principios de diseño de Apple (simplicidad, jerarquía y uso moderado del color):"
+Bullet "Un único color de acento; el color se reserva para estado y acción."
+Bullet "Superficies neutras, bordes sutiles y tipografía del sistema; cifras tabulares en los datos."
+Bullet "Iconos SVG monocromos coherentes en menú, botones y estados."
+Bullet "Tema claro y oscuro automático según el sistema, con conmutador manual en la barra superior."
+Bullet "Accesibilidad: contraste WCAG AA, foco de teclado visible y respeto a la preferencia Reducir movimiento."
+Shot "16-home-oscuro.png" "Figura 13. La misma interfaz en tema oscuro."
 
 BreakPage
 
@@ -266,22 +278,31 @@ Code @(
 )
 P "Si GitHub no responde se conserva el ultimo resultado correcto y se registra el error en el log; la app sigue funcionando con normalidad."
 
-H2 "5.2 Qué hace y qué no hace"
+H2 "5.2 Aviso al usuario"
 Table @("Comportamiento", "Estado") @(
   @("Detecta que existe una versión nueva", "Implementado"),
   @("Muestra changelog al administrador", "Implementado"),
   @("Muestra novedades al resto de usuarios una vez", "Implementado"),
-  @("Descarga e instala la actualización automáticamente", "No implementado"),
-  @("Reinicia la aplicación tras instalar", "No implementado")
+  @("El botón Actualizar abre la página del release", "Implementado")
 )
-P "Importante: el botón Actualizar abre GitHub Releases. La actualización real se hace ejecutando el instalador publicado en el servidor y reiniciando el App Pool de IIS (o el servicio de Windows)."
 
-H2 "5.3 Configuración del intervalo"
+H2 "5.3 Actualización automática (instalación)"
+P "El instalador registra una tarea de Windows ('SXA-RTX-Analytics-Updater') que ejecuta tools/update-analytics.ps1 cada hora:"
+Code @(
+  "1. Compara la version instalada con el ultimo release de GitHub.",
+  "2. Si hay version nueva, descarga el ZIP de publicacion y lo valida.",
+  "3. Hace backup, detiene el servicio / recicla el App Pool,",
+  "   reemplaza los archivos y reinicia.",
+  "4. Verifica /health/live; si falla, restaura el backup (rollback)."
+)
+P "También puede ejecutarse a mano en el servidor con -DryRun para simular sin aplicar cambios."
+
+H2 "5.4 Configuración del intervalo"
 Bullet "UpdateCheck:IntervalMinutes en appsettings.json (60 por defecto)."
 Bullet "Clave App.UpdateCheckMinutes para ajustarlo en caliente; 0 desactiva la comprobación."
 
-H2 "5.4 Captura del aviso"
-Shot "15-actualizacion-disponible.png" "Figura 13. Aviso de actualizacion disponible para el administrador (escenario simulado: app en una version anterior y release nuevo publicado en GitHub)."
+H2 "5.5 Captura del aviso"
+Shot "15-actualizacion-disponible.png" "Figura 14. Aviso de actualizacion disponible para el administrador (escenario simulado: app en una version anterior y release nuevo publicado en GitHub)."
 
 BreakPage
 
@@ -345,23 +366,25 @@ BreakPage
 # ------------------------------------------ 9. Pendientes -------------------
 H1 "9. Limitaciones y trabajo pendiente"
 H2 "9.1 Pendiente de validar en planta"
-Bullet "Conectar el SQL Server real: hasta ahora la app opera con EF Core InMemory y datos de demostracion. Hay que crear la base SXA_RTX_Analytics en el servidor y cargar las tablas."
-Bullet "Configurar la base operacional en /configuration y comprobar que la cabecera de /query deja de mostrar 'Base de configuracion'."
-Bullet "Ajustar los timeouts (5 s de conexion, 15 s de comando) si la red de planta lo exige."
-Bullet "Como el esquema se crea con EnsureCreated, una base existente no gana columnas nuevas (por ejemplo Equipo.Tipo). Para produccion conviene migrar a migraciones de EF Core."
+Bullet "Conectar el SQL Server real (10.96.16.114 / hussmann_Insight) y ejecutar el script database/init-hussmann-insight.sql una vez para crear las tablas SXA_RTX_*."
+Bullet "Configurar la base operacional en /configuration y comprobar que la cabecera de /query deja de mostrar 'Base de configuración'."
+Bullet "Confirmar si el catálogo dbo.SXA_PCs vive en hussmann_Insight o en otra base, y confirmar el nombre real de la columna de origen (por defecto OrigenPC)."
+Bullet "Validar el updater en el servidor (tools/update-analytics.ps1) antes de dejarlo programado."
+Bullet "Ajustar los timeouts (5 s de conexión, 15 s de comando) si la red de planta lo exige."
+Bullet "Como las tablas ya existen, no dependemos de EnsureCreated; aun así, para producción conviene migrar a migraciones de EF Core."
 
 H2 "9.2 Pendiente - instalador y despliegue"
 Bullet "El instalador detecta IIS pero no instala el Hosting Bundle; debe descargarse e instalarse previamente."
-Bullet "El instalador no solicita la cadena de conexión ni crea la base de datos."
+Bullet "El instalador no solicita la cadena de conexión; se define por variable de entorno / /configuration."
 Bullet "El sitio se crea en el puerto 5000; conviene parametrizarlo y configurar HTTPS."
 
-H2 "9.3 Pendiente - actualizaciones automáticas"
-Bullet "Implementar descarga e instalación automática y reinicio del App Pool si se requiere actualización desatendida."
+H2 "9.3 Actualizaciones automáticas"
+Bullet "Implementado: tarea programada horaria que descarga, reemplaza y reinicia con verificación de salud y rollback."
+Bullet "Pendiente: validación en el servidor real y, si se desea, firma/verificación del paquete descargado."
 
 H2 "9.4 Otros puntos técnicos"
 Bullet "La exportación a PDF incluye la tabla y el resumen, pero no la imagen del gráfico."
 Bullet "El proyecto apunta a net10.0; la especificación original era .NET 8 LTS. Verificar la versión del runtime en el servidor."
-Bullet "Las capturas de esta informe se generaron en un navegador sin tipografía de emoji; en el equipo del usuario los iconos se muestran correctamente."
 
 BreakPage
 

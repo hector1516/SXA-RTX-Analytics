@@ -13,16 +13,23 @@
     <link rel="icon" type="image/png" href="favicon.png" />
     <HeadOutlet />
     <script>
-        // Tema claro/oscuro segun la preferencia del sistema (Bootstrap 5.3 data-bs-theme).
+        // Tema claro/oscuro: preferencia guardada del usuario > preferencia del sistema.
         // Se ejecuta antes de pintar para evitar el parpadeo al cargar.
         (function () {
             var mq = window.matchMedia('(prefers-color-scheme: dark)');
-            function apply() {
-                document.documentElement.setAttribute('data-bs-theme', mq.matches ? 'dark' : 'light');
+            function currentTheme() {
+                return localStorage.getItem('rx-theme') || (mq.matches ? 'dark' : 'light');
             }
+            function apply() {
+                document.documentElement.setAttribute('data-bs-theme', currentTheme());
+            }
+            window.rxSetTheme = function (t) { localStorage.setItem('rx-theme', t); apply(); };
+            window.rxToggleTheme = function () {
+                window.rxSetTheme(document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark');
+            };
             apply();
-            try { mq.addEventListener('change', apply); }
-            catch (e) { mq.addListener(apply); }
+            try { mq.addEventListener('change', function () { if (!localStorage.getItem('rx-theme')) apply(); }); }
+            catch (e) { mq.addListener(function () { if (!localStorage.getItem('rx-theme')) apply(); }); }
         })();
     </script>
 </head>

@@ -1,18 +1,18 @@
 {
   "status": "Healthy",
-  "duration": "00:00:00.0044099",
+  "duration": "00:00:00.0057972",
   "checks": [
     {
       "name": "configuration_database",
       "status": "Healthy",
-      "duration": "00:00:00.0035232",
+      "duration": "00:00:00.0052529",
       "description": null,
       "data": {}
     },
     {
       "name": "self",
       "status": "Healthy",
-      "duration": "00:00:00.0001298",
+      "duration": "00:00:00.0000031",
       "description": "Application is running",
       "data": {}
     }

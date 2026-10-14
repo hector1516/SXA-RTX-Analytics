@@ -24,6 +24,7 @@
                             <span class="rx-chip">@Role(context)</span>
                         </span>
                         <a href="/logout" class="btn btn-sm btn-outline-secondary"><Icon Name="logout" Size="16" /> Salir</a>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="ToggleTheme" title="Cambiar tema claro/oscuro" aria-label="Cambiar tema"><Icon Name="theme" Size="16" /></button>
                     </div>
                 </Authorized>
                 <NotAuthorized>
@@ -93,6 +94,11 @@
     string Initial(string? name) => string.IsNullOrEmpty(name) ? "?" : name.Substring(0,1).ToUpperInvariant();
     bool IsAdmin(AuthenticationState s) => s.User.IsInRole("Administrador");
     string Role(AuthenticationState s) => s.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
+
+    async Task ToggleTheme()
+    {
+        try { await JS.InvokeVoidAsync("rxToggleTheme"); } catch { }
+    }
 
     // Convierte el markdown del release (titulos, tablas, negritas, codigo) a texto plano legible.
     string PrettyChangelog(string? md)
