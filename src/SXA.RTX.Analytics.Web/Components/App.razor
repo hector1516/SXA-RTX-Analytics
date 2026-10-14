@@ -12,6 +12,19 @@
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
     <HeadOutlet />
+    <script>
+        // Tema claro/oscuro segun la preferencia del sistema (Bootstrap 5.3 data-bs-theme).
+        // Se ejecuta antes de pintar para evitar el parpadeo al cargar.
+        (function () {
+            var mq = window.matchMedia('(prefers-color-scheme: dark)');
+            function apply() {
+                document.documentElement.setAttribute('data-bs-theme', mq.matches ? 'dark' : 'light');
+            }
+            apply();
+            try { mq.addEventListener('change', apply); }
+            catch (e) { mq.addListener(apply); }
+        })();
+    </script>
 </head>
 
 <body>

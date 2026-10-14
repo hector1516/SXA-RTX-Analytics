@@ -1,23 +1,127 @@
+// Gráficas Chart.js con la paleta minimalista y adaptadas al tema claro/oscuro.
+window.__rxVar = function (name, fallback) {
+    try {
+        const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        return v || fallback;
+    } catch (e) { return fallback; }
+};
+
+window.__rxColors = function () {
+    return {
+        accent: window.__rxVar('--rx-accent', '#2F6BE0'),
+        warning: window.__rxVar('--rx-warning', '#B45309'),
+        neutral: window.__rxVar('--rx-border-strong', '#D1D5DB'),
+        text: window.__rxVar('--rx-text', '#111827'),
+        muted: window.__rxVar('--rx-muted', '#6B7280'),
+        border: window.__rxVar('--rx-border', '#E5E7EB'),
+        surface: window.__rxVar('--rx-surface', '#FFFFFF')
+    };
+};
+
+function rxBaseOptions() {
+    const c = window.__rxColors();
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: {
+                grid: { display: false },
+                border: { color: c.border },
+                ticks: { color: c.muted, font: { size: 11 } }
+            },
+            y: {
+                beginAtZero: true,
+                grid: { color: c.border, drawTicks: false },
+                border: { display: false },
+                ticks: { color: c.muted, font: { size: 11 }, precision: 0 }
+            }
+        }
+    };
+}
+
+// Dona para proporciones.
+window.renderDonut = (canvasId, labels, values) => {
+    const el = document.getElementById(canvasId);
+    if (!el) return;
+    if (el._chart) el._chart.destroy();
+    const c = window.__rxColors();
+    el._chart = new Chart(el, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: values,
+                backgroundColor: [c.accent, c.warning, c.neutral],
+                borderColor: c.surface,
+                borderWidth: 2,
+                hoverOffset: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '70%',
+            plugins: { legend: { display: false }, tooltip: { enabled: true } }
+        }
+    });
+};
+
+// Barras para comparaciones.
+window.renderBars = (canvasId, labels, values, label) => {
+    const el = document.getElementById(canvasId);
+    if (!el) return;
+    if (el._chart) el._chart.destroy();
+    const c = window.__rxColors();
+    el._chart = new Chart(el, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: label || '',
+                data: values,
+                backgroundColor: c.accent,
+                borderRadius: 6,
+                maxBarThickness: 30
+            }]
+        },
+        options: rxBaseOptions()
+    });
+};
+
+// Genérico (usado por /query).
 window.renderChart = (canvasId, type, labels, values, label) => {
-    const ctx = document.getElementById(canvasId);
-    if (!ctx) return;
-    if (ctx._chart) ctx._chart.destroy();
-    const cfg = {
-        type: type === 'pastel' ? 'pie' : type === 'area' ? 'line' : type,
+    const el = document.getElementById(canvasId);
+    if (!el) return;
+    if (el._chart) el._chart.destroy();
+    const c = window.__rxColors();
+    const isPie = type === 'pastel' || type === 'pie';
+    const isArea = type === 'area';
+    const chartType = isPie ? 'doughnut' : isArea ? 'line' : (type === 'bar' ? 'bar' : type);
+
+    const options = isPie
+        ? { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { color: c.text, boxWidth: 12 } } } }
+        : rxBaseOptions();
+    if (!isPie) options.plugins = { legend: { display: false } };
+
+    el._chart = new Chart(el, {
+        type: chartType,
         data: {
             labels: labels,
             datasets: [{
                 label: label || 'Valor',
                 data: values,
-                backgroundColor: type === 'pastel'
-                    ? ['#3A7BD5','#FFC84B','#2ECC71','#FF6B35','#8EC6FF','#9AA8BE']
-                    : type === 'area' ? 'rgba(58,123,213,0.25)' : '#3A7BD5',
-                borderColor: '#3A7BD5',
-                fill: type === 'area',
-                tension: 0.3
+                backgroundColor: isPie
+                    ? [c.accent, c.warning, c.neutral, '#0EA5E9', '#8B5CF6']
+                    : isArea ? 'rgba(47,107,224,0.18)' : c.accent,
+                borderColor: c.accent,
+                borderWidth: isArea ? 2 : (isPie ? 2 : 0),
+                fill: isArea,
+                tension: 0.3,
+                borderRadius: isArea ? 0 : 6,
+                maxBarThickness: 34
             }]
         },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
-    };
-    ctx._chart = new Chart(ctx, cfg);
+        options: options
+    });
 };

@@ -7,18 +7,15 @@
 main { flex: 1; display: flex; flex-direction: column; }
 article { flex: 1; }
 
+/* Barra lateral: neutra y oscura, un solo tono. */
 .sidebar {
-  background:
-    radial-gradient(500px 300px at 20% 0%, rgba(255,200,75,.18), transparent 60%),
-    radial-gradient(600px 400px at 80% 90%, rgba(90,169,230,.22), transparent 60%),
-    linear-gradient(180deg, #0F1F3A 0%, #1B2A4E 45%, #23406E 100%);
-  border-right: 1px solid rgba(255,255,255,.08);
+  background: var(--rx-sidebar-bg);
+  border-right: 1px solid var(--rx-sidebar-border);
 }
 
 .rtx-topbar {
-  background: rgba(255,255,255,.82);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid #D9E2EC;
+  background: var(--rx-surface);
+  border-bottom: 1px solid var(--rx-border);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -26,7 +23,6 @@ article { flex: 1; }
 
 .top-row { height: 3.6rem; display: flex; align-items: center; justify-content: flex-end; }
 .top-row ::deep a, .top-row ::deep .btn-link { white-space: nowrap; margin-left: 1rem; text-decoration: none; }
-.top-row ::deep a:hover { text-decoration: underline; }
 
 #blazor-error-ui {
   color-scheme: light only;
@@ -42,6 +38,6 @@ article { flex: 1; }
 }
 @media (min-width: 641px) {
   .page { flex-direction: row; }
-  .sidebar { width: 280px; height: 100vh; position: sticky; top: 0; overflow: hidden; }
-  .top-row, article, footer { padding-left: 2rem !important; padding-right: 1.5rem !important; }
+  .sidebar { width: 248px; height: 100vh; position: sticky; top: 0; overflow: hidden; }
+  .top-row, article, footer { padding-left: 2rem !important; padding-right: 2rem !important; }
 }

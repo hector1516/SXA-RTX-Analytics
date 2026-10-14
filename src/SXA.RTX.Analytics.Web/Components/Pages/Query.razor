@@ -48,9 +48,9 @@
                 <div class="form-text"><a href="#" @onclick:preventDefault="true" @onclick="LoadTablas">Recargar tablas</a> (@TablasFiltradas.Count) — usa la conexión de <code>/configuration</code></div>
             </div>
             <div class="col-md-5 d-flex align-items-end gap-2">
-                <button class="btn btn-primary btn-sm" @onclick="Ejecutar" disabled="@IsRunning">@if (IsRunning) { <span class="spinner-border spinner-border-sm"></span> } else { @("Ejecutar") }</button>
-                <button class="btn btn-primary btn-sm" @onclick="ExportExcel" disabled="@(Result==null)" style="min-width:92px">📊 Excel</button>
-                <button class="btn btn-primary btn-sm" @onclick="ExportPdf" disabled="@(Result==null)" style="min-width:92px">📄 PDF</button>
+                <button class="btn btn-primary btn-sm" @onclick="Ejecutar" disabled="@IsRunning">@if (IsRunning) { <span class="spinner-border spinner-border-sm"></span> } else { <Icon Name="check" Size="16" /> } Ejecutar</button>
+                <button class="btn btn-outline-primary btn-sm" @onclick="ExportExcel" disabled="@(Result==null)" style="min-width:104px"><Icon Name="sheet" Size="16" /> Excel</button>
+                <button class="btn btn-outline-primary btn-sm" @onclick="ExportPdf" disabled="@(Result==null)" style="min-width:104px"><Icon Name="file-pdf" Size="16" /> PDF</button>
             </div>
         </div>
 

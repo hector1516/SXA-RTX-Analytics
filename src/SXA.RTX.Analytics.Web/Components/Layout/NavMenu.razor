@@ -1,10 +1,9 @@
-﻿<div class="rtx-brand ps-3 py-3">
+﻿<div class="rtx-brand px-3 py-3">
     <a href="" class="text-decoration-none d-flex align-items-center gap-3">
-        <img src="img/logo.png" alt="SXA-RTX" width="52" height="52" class="rtx-logo" />
+        <img src="img/logo.png" alt="SXA-RTX" width="40" height="40" class="rtx-logo" />
         <div class="lh-sm">
             <div class="rtx-brand-title">SXA-RTX</div>
-            <div class="rtx-brand-sub">Analytics</div>
-            <div class="rtx-brand-tag">ECCSA Automation</div>
+            <div class="rtx-brand-tag">Analytics</div>
         </div>
     </a>
 </div>
@@ -12,65 +11,56 @@
 <input type="checkbox" title="Navigation menu" class="navbar-toggler" />
 
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column gap-1 px-2">
+    <nav class="nav flex-column gap-1 px-2 py-2">
         <div class="nav-item">
             <NavLink class="nav-link rtx-navlink" href="" Match="NavLinkMatch.All">
-                <span class="rtx-nav-icon">◉</span> Inicio
+                <span class="rtx-nav-icon"><Icon Name="home" Size="18" /></span> Inicio
+            </NavLink>
+        </div>
+        <div class="nav-item">
+            <NavLink class="nav-link rtx-navlink" href="query">
+                <span class="rtx-nav-icon"><Icon Name="chart" Size="18" /></span> Consulta
             </NavLink>
         </div>
         <AuthorizeView Roles="Administrador">
             <Authorized>
                 <div class="nav-item">
                     <NavLink class="nav-link rtx-navlink" href="configuration">
-                        <span class="rtx-nav-icon">⚙</span> Configuración
+                        <span class="rtx-nav-icon"><Icon Name="settings" Size="18" /></span> Configuración
                     </NavLink>
                 </div>
-            </Authorized>
-        </AuthorizeView>
-        <AuthorizeView Roles="Administrador">
-            <Authorized>
                 <div class="nav-item">
                     <NavLink class="nav-link rtx-navlink" href="users">
-                        <span class="rtx-nav-icon">⧉</span> Usuarios
+                        <span class="rtx-nav-icon"><Icon Name="users" Size="18" /></span> Usuarios
                     </NavLink>
                 </div>
             </Authorized>
         </AuthorizeView>
-        <div class="nav-item">
-            <NavLink class="nav-link rtx-navlink" href="query">
-                <span class="rtx-nav-icon">◍</span> Consulta
-            </NavLink>
-        </div>
-
-
-
     </nav>
 </div>
 
 <style>
-.rtx-brand { border-bottom: 1px solid rgba(255,255,255,.08); }
-.rtx-logo { filter: drop-shadow(0 6px 12px rgba(0,0,0,.35)); border-radius: 14px; background: #fff; padding: 4px; }
-.rtx-brand-title { color: #fff; font-weight: 800; font-size: 1.15rem; letter-spacing: .02em; line-height: 1; }
-.rtx-brand-sub { color: #FFC84B; font-weight: 800; font-size: 1.05rem; line-height: 1; letter-spacing: .02em; }
-.rtx-brand-tag { color: rgba(255,255,255,.7); font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; }
-.rtx-brand-badge {
-  display: flex; align-items: center; gap: .45rem; justify-content: center;
-  font-size: .62rem; font-weight: 800; letter-spacing: .08em; color: rgba(255,255,255,.85);
-  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); border-radius: 999px; padding: .35rem .6rem;
-}
-.rtx-nav-section { color: rgba(255,255,255,.55); font-size: .65rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; padding: .5rem .75rem; }
-.rtx-navlink {
-  border-radius: 12px; color: rgba(255,255,255,.88) !important; font-weight: 600; display: flex; align-items: center; gap: .6rem;
-  border: 1px solid transparent;
-}
-.rtx-navlink:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.14); color: #fff !important; }
-.rtx-navlink.active { background: #fff !important; color: #1B2A4E !important; box-shadow: 0 8px 18px rgba(0,0,0,.22); }
-.rtx-nav-icon { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: rgba(255,255,255,.12); font-size: .85rem; }
-.rtx-navlink.active .rtx-nav-icon { background: linear-gradient(135deg, #3A7BD5, #5AA9E6); color: #fff; }
-.rtx-mecha-card {
-  position: relative; overflow: hidden; border-radius: 16px; background: linear-gradient(135deg, #fff 0%, #EAF4FF 100%);
-  padding: 14px; text-align: center; color: #1B2A4E; border: 1px solid rgba(255,255,255,.9);
-}
-.rtx-mecha-card-blob { position: absolute; width: 180px; height: 180px; background: radial-gradient(circle, rgba(255,200,75,.35), transparent 70%); right: -40px; top: -40px; }
-.rtx-mecha-mini { width: 78px; height: auto; filter: drop-shadow(0 8px 14px rgba(0,0,0,.18)); position: relative; }
+    .navbar-toggler {
+        appearance: none;
+        cursor: pointer;
+        width: 3rem;
+        height: 2.25rem;
+        color: rgba(255,255,255,.7);
+        position: absolute;
+        top: 0.75rem;
+        right: 1rem;
+        border: 1px solid var(--rx-sidebar-border);
+        border-radius: 8px;
+        background: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255,255,255,0.7%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") no-repeat center/1.25rem;
+    }
+    .navbar-toggler:checked { background-color: rgba(255,255,255,.08); }
+
+    .nav-item { font-size: 0.9rem; }
+    .nav-scrollable { display: none; }
+    .navbar-toggler:checked ~ .nav-scrollable { display: block; }
+
+    @@media (min-width: 641px) {
+        .navbar-toggler { display: none; }
+        .nav-scrollable { display: block; height: calc(100vh - 4rem); overflow-y: auto; }
+    }
 </style>

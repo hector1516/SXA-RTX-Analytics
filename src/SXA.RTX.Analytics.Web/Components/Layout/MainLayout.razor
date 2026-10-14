@@ -14,18 +14,16 @@
 
     <main>
         <div class="top-row px-4 rtx-topbar">
-            <div class="d-flex align-items-center gap-2">
-                <span class="rtx-pill rtx-pill--mint rtx-pulse"><span class="rtx-kicker-dot"></span> LIVE</span>
-            </div>
+            <span class="rx-chip rx-chip--ok me-auto"><span class="rx-dot"></span> En línea</span>
             <AuthorizeView>
                 <Authorized>
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="rtx-pill" style="background:#fff; border-color:#D9E2EC">
-                            <span style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#3A7BD5,#5AA9E6);color:#fff;display:grid;place-items:center;font-weight:800;font-size:.8rem">@Initial(context.User.Identity?.Name)</span>
-                            @context.User.Identity?.Name
-                            <span class="badge @(IsAdmin(context) ? "bg-primary" : "bg-secondary")" style="font-size:.65rem">@Role(context)</span>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="d-inline-flex align-items-center gap-2 small">
+                            <span style="width:30px;height:30px;border-radius:50%;background:var(--rx-accent-soft);color:var(--rx-accent-strong);display:grid;place-items:center;font-weight:700;font-size:.8rem">@Initial(context.User.Identity?.Name)</span>
+                            <span class="fw-semibold">@context.User.Identity?.Name</span>
+                            <span class="rx-chip">@Role(context)</span>
                         </span>
-                        <a href="/logout" class="btn btn-sm btn-outline-secondary">Salir</a>
+                        <a href="/logout" class="btn btn-sm btn-outline-secondary"><Icon Name="logout" Size="16" /> Salir</a>
                     </div>
                 </Authorized>
                 <NotAuthorized>
@@ -38,22 +36,19 @@
             @Body
         </article>
 
-        <footer class="px-4 py-3 rtx-footer border-top mt-4">
+        <footer class="px-4 py-3 rtx-footer mt-4">
             <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center">
                 <div class="d-flex align-items-center gap-3 flex-wrap">
-                    <img src="img/eccsa.png" alt="ECCSA Automation" height="28" class="rtx-footer-logo" />
-                    <span class="text-muted small">Soluciones en Automatización y Control</span>
-                    <span class="vr d-none d-sm-block" style="height:24px"></span>
-                    <img src="img/hussmann.png" alt="Hussmann" height="20" class="rtx-footer-logo" />
+                    <img src="img/eccsa.png" alt="ECCSA Automation" height="22" class="rtx-footer-logo" />
+                    <span class="vr d-none d-sm-block" style="height:20px"></span>
+                    <img src="img/hussmann.png" alt="Hussmann" height="16" class="rtx-footer-logo" />
+                    <span class="d-none d-lg-inline">Uso interno · confidencial</span>
                 </div>
-                <div class="d-flex gap-2 align-items-center">
-                    <span class="rtx-pill rtx-pill--sky">Blazor</span>
-                    <span class="rtx-pill rtx-pill--honey">EFCore</span>
-                    <span class="rtx-pill">SQL Server</span>
-                    <span class="small text-muted d-none d-xl-inline">— SXA-RTX × ECCSA</span>
+                <div class="d-flex gap-3 align-items-center">
+                    <span>v@(Version)</span>
+                    <a href="/health" target="_blank" class="text-muted text-decoration-none">Estado del sistema</a>
                 </div>
             </div>
-            <div class="small text-muted mt-2 d-flex gap-2 align-items-center flex-wrap" style="opacity:.7">© ECCSA Automation — Plataforma interna SXA-RTX Analytics. Uso confidencial. <span class="vr" style="height:12px"></span> <span style="font-size:.62rem">v@(Version)</span> <a href="/health" target="_blank" class="text-muted" style="font-size:.62rem; opacity:.45; text-decoration:none">· health</a></div>
         </footer>
     </main>
 </div>
