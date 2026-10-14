@@ -221,8 +221,8 @@ h3, h4 { font-weight: 650; }
   color: var(--rx-text-soft);
 }
 .rtx-pill--sky { background: var(--rx-accent-soft); border-color: transparent; color: var(--rx-accent-strong); }
-.rtx-pill--mint { background: var(--rx-success-soft); border-color: transparent; color: var(--rx-success); }
-.rtx-pill--honey { background: var(--rx-warning-soft); border-color: transparent; color: var(--rx-warning); }
+.rtx-pill--mint { background: var(--rx-surface-2); border-color: transparent; color: var(--rx-text-soft); }
+.rtx-pill--honey { background: var(--rx-surface-2); border-color: transparent; color: var(--rx-text-soft); }
 .rtx-pill--animated { border-width: 1px; }
 
 /* Compat: usar soft backgrounds en badges bg-light */
@@ -231,12 +231,12 @@ h3, h4 { font-weight: 650; }
 /* --- Indicadores de estado ---------------------------------------------- */
 .rx-chip { display: inline-flex; align-items: center; gap: .45rem; font-size: .8rem; font-weight: 600; padding: .25rem .6rem; border-radius: 999px; border: 1px solid var(--rx-border); }
 .rx-chip .rx-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rx-muted); }
-.rx-chip--ok { color: var(--rx-success); border-color: transparent; background: var(--rx-success-soft); }
-.rx-chip--ok .rx-dot { background: var(--rx-success); }
-.rx-chip--warn { color: var(--rx-warning); border-color: transparent; background: var(--rx-warning-soft); }
-.rx-chip--warn .rx-dot { background: var(--rx-warning); }
+.rx-chip--ok { color: var(--rx-accent); border-color: transparent; background: var(--rx-accent-soft); }
+.rx-chip--ok .rx-dot { background: var(--rx-accent); }
+.rx-chip--warn { color: var(--rx-text-soft); border-color: transparent; background: var(--rx-surface-2); }
+.rx-chip--warn .rx-dot { background: var(--rx-border-strong); }
 .rx-chip--off { color: var(--rx-muted); }
-.rx-chip--off .rx-dot { background: var(--rx-muted); }
+.rx-chip--off .rx-dot { background: var(--rx-border-strong); }
 
 .rx-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
@@ -309,6 +309,15 @@ h3, h4 { font-weight: 650; }
 .rtx-float { animation: none; }
 .rtx-pulse::before { content: none; }
 .rtx-gauge { display: none; }
+
+/* --- Avisos (un solo acento; el rojo solo para error real) ---------------- */
+.alert { border-radius: var(--rx-radius-sm); border: 1px solid var(--rx-border); }
+.alert-success, .alert-info, .alert-secondary {
+  background: var(--rx-surface-2);
+  color: var(--rx-text);
+  border-color: var(--rx-border);
+}
+.alert-danger { background: var(--rx-danger-soft); color: var(--rx-danger); border-color: transparent; }
 
 /* --- Validación ---------------------------------------------------------- */
 .valid.modified:not([type=checkbox]) { outline: 1px solid var(--rx-success); }

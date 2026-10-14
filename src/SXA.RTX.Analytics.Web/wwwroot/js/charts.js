@@ -112,7 +112,7 @@ window.renderChart = (canvasId, type, labels, values, label) => {
                 label: label || 'Valor',
                 data: values,
                 backgroundColor: isPie
-                    ? [c.accent, c.muted, '#5AC8FA', '#FF9F0A', '#FF6482']
+                    ? [c.accent, '#5AC8FA', c.muted, '#AEAEB2', '#8E8E93']
                     : isArea ? 'rgba(0,113,227,0.16)' : c.accent,
                 borderColor: c.accent,
                 borderWidth: isArea ? 2 : (isPie ? 2 : 0),
