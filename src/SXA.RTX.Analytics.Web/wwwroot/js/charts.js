@@ -52,7 +52,7 @@ window.renderDonut = (canvasId, labels, values) => {
             labels: labels,
             datasets: [{
                 data: values,
-                backgroundColor: [c.accent, c.warning, c.neutral],
+                backgroundColor: [c.accent, c.muted, c.neutral],
                 borderColor: c.surface,
                 borderWidth: 2,
                 hoverOffset: 2
@@ -112,8 +112,8 @@ window.renderChart = (canvasId, type, labels, values, label) => {
                 label: label || 'Valor',
                 data: values,
                 backgroundColor: isPie
-                    ? [c.accent, c.warning, c.neutral, '#0EA5E9', '#8B5CF6']
-                    : isArea ? 'rgba(47,107,224,0.18)' : c.accent,
+                    ? [c.accent, c.muted, '#5AC8FA', '#FF9F0A', '#FF6482']
+                    : isArea ? 'rgba(0,113,227,0.16)' : c.accent,
                 borderColor: c.accent,
                 borderWidth: isArea ? 2 : (isPie ? 2 : 0),
                 fill: isArea,

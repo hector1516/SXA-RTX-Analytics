@@ -7,6 +7,23 @@
 main { flex: 1; display: flex; flex-direction: column; }
 article { flex: 1; }
 
+/* Marca de agua: logo grande y tenue, esquina inferior derecha, detrás del contenido. */
+.rx-watermark {
+  position: fixed;
+  right: -6vw;
+  bottom: -8vh;
+  width: 85vh;
+  height: 85vh;
+  max-width: 1200px;
+  max-height: 1200px;
+  background: url("img/logo.png") no-repeat center / contain;
+  opacity: .08;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+}
+[data-bs-theme="dark"] .rx-watermark { opacity: .10; }
+
 /* Barra lateral: cristal translúcido (se adapta al tema por variables). */
 .sidebar {
   background: var(--rx-sidebar-bg);

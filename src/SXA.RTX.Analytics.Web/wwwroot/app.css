@@ -9,53 +9,52 @@
 :root {
   color-scheme: light;
 
-  /* Acento único */
-  --rx-accent: #2F6BE0;
-  --rx-accent-strong: #1D4ED8;
-  --rx-accent-soft: #EAF1FE;
+  /* Acento único: azul de sistema de Apple */
+  --rx-accent: #0071E3;
+  --rx-accent-strong: #0062C4;
+  --rx-accent-soft: #EAF3FF;
 
-  /* Neutros */
-  --rx-bg: #F6F7F9;
+  /* Neutros (escala tipo Apple) */
+  --rx-bg: #F5F5F7;
   --rx-surface: #FFFFFF;
-  --rx-surface-2: #F3F4F6;
-  --rx-border: #E5E7EB;
-  --rx-border-strong: #D1D5DB;
-  --rx-text: #111827;
-  --rx-text-soft: #374151;
-  --rx-muted: #6B7280;
+  --rx-surface-2: #F5F5F7;
+  --rx-border: #D2D2D7;
+  --rx-border-strong: #C7C7CC;
+  --rx-text: #1D1D1F;
+  --rx-text-soft: #3A3A3C;
+  --rx-muted: #6E6E73;
 
-  /* Estado (solo para estado) */
-  --rx-success: #15803D;
-  --rx-success-soft: #ECFDF3;
-  --rx-warning: #B45309;
-  --rx-warning-soft: #FEF6E7;
-  --rx-danger: #B91C1C;
-  --rx-danger-soft: #FEF2F2;
+  /* Estado (colores de sistema, uso moderado) */
+  --rx-success: #248A3D;
+  --rx-success-soft: #E9F6EC;
+  --rx-warning: #B25000;
+  --rx-warning-soft: #FDF1E3;
+  --rx-danger: #D70015;
+  --rx-danger-soft: #FDECEC;
 
   /* Forma */
   --rx-radius: 12px;
   --rx-radius-sm: 8px;
-  --rx-shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 1px 3px rgba(16, 24, 40, .06);
+  --rx-shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 1px 3px rgba(0, 0, 0, .05);
 
   /* Barra lateral: cristal translúcido que se adapta al tema */
   --rx-sidebar-bg: rgba(255, 255, 255, .62);
-  --rx-sidebar-border: rgba(15, 23, 42, .08);
-  --rx-sidebar-text: rgba(15, 23, 42, .72);
-  --rx-sidebar-text-strong: #0F172A;
-  --rx-sidebar-hover: rgba(15, 23, 42, .05);
-  --rx-sidebar-active: rgba(47, 107, 224, .12);
+  --rx-sidebar-border: rgba(0, 0, 0, .08);
+  --rx-sidebar-text: rgba(29, 29, 31, .72);
+  --rx-sidebar-text-strong: #1D1D1F;
+  --rx-sidebar-hover: rgba(0, 0, 0, .05);
+  --rx-sidebar-active: rgba(0, 113, 227, .12);
 
-  /* Compatibilidad: se mantienen los nombres --rtx-* que usan las páginas,
-     remapeados a la paleta minimalista. */
-  --rtx-navy: #111827;
-  --rtx-navy-soft: #1F2937;
+  /* Compatibilidad: nombres --rtx-* usados por las páginas */
+  --rtx-navy: #1D1D1F;
+  --rtx-navy-soft: #3A3A3C;
   --rtx-blue: var(--rx-accent);
-  --rtx-blue-light: #5B8DEF;
-  --rtx-sky: #9DBEF5;
-  --rtx-honey: #F59E0B;
+  --rtx-blue-light: #4DA3FF;
+  --rtx-sky: #9CC7FF;
+  --rtx-honey: #FF9F0A;
   --rtx-honey-deep: var(--rx-warning);
   --rtx-flame: var(--rx-danger);
-  --rtx-mint: #16A34A;
+  --rtx-mint: #34C759;
   --rtx-mint-soft: var(--rx-success-soft);
   --rtx-panel: var(--rx-surface-2);
   --rtx-panel-2: var(--rx-surface-2);
@@ -73,33 +72,33 @@
 /* Modo oscuro coherente con los mismos tokens. */
 [data-bs-theme="dark"] {
   color-scheme: dark;
-  --rx-bg: #0B0D12;
-  --rx-surface: #14171E;
-  --rx-surface-2: #1A1E27;
-  --rx-border: #262B36;
-  --rx-border-strong: #333A48;
-  --rx-text: #F3F4F6;
-  --rx-text-soft: #D1D5DB;
-  --rx-muted: #9CA3AF;
-  --rx-accent: #5B8DEF;
-  --rx-accent-strong: #7AA5F5;
-  --rx-accent-soft: #17233B;
-  --rx-success: #4ADE80;
-  --rx-success-soft: #12281C;
-  --rx-warning: #FBBF24;
-  --rx-warning-soft: #2A2110;
-  --rx-danger: #F87171;
-  --rx-danger-soft: #2A1414;
-  --rx-sidebar-bg: rgba(18, 21, 28, .60);
-  --rx-sidebar-border: rgba(255, 255, 255, .08);
-  --rx-sidebar-text: rgba(255, 255, 255, .70);
+  --rx-bg: #000000;
+  --rx-surface: #1C1C1E;
+  --rx-surface-2: #2C2C2E;
+  --rx-border: #38383A;
+  --rx-border-strong: #48484A;
+  --rx-text: #F5F5F7;
+  --rx-text-soft: #D1D1D6;
+  --rx-muted: #8E8E93;
+  --rx-accent: #0A84FF;
+  --rx-accent-strong: #409CFF;
+  --rx-accent-soft: #10243D;
+  --rx-success: #30D158;
+  --rx-success-soft: #10281A;
+  --rx-warning: #FF9F0A;
+  --rx-warning-soft: #2A1F0A;
+  --rx-danger: #FF453A;
+  --rx-danger-soft: #2A1413;
+  --rx-sidebar-bg: rgba(28, 28, 30, .60);
+  --rx-sidebar-border: rgba(255, 255, 255, .10);
+  --rx-sidebar-text: rgba(255, 255, 255, .72);
   --rx-sidebar-text-strong: #FFFFFF;
-  --rx-sidebar-hover: rgba(255, 255, 255, .06);
-  --rx-sidebar-active: rgba(91, 141, 239, .18);
-  --rtx-navy: #F3F4F6;
-  --rtx-navy-soft: #D1D5DB;
-  --rtx-honey: #FBBF24;
-  --rtx-mint: #4ADE80;
+  --rx-sidebar-hover: rgba(255, 255, 255, .08);
+  --rx-sidebar-active: rgba(10, 132, 255, .22);
+  --rtx-navy: #F5F5F7;
+  --rtx-navy-soft: #D1D1D6;
+  --rtx-honey: #FF9F0A;
+  --rtx-mint: #30D158;
 }
 
 html, body {

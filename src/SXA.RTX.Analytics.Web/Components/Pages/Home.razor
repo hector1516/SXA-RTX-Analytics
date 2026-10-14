@@ -98,7 +98,7 @@
                 <div class="rx-chart" style="height:200px"><canvas id="homeTipo"></canvas></div>
                 <div class="d-flex justify-content-center gap-4 mt-3 small">
                     <span class="d-inline-flex align-items-center gap-2"><span class="rx-dot" style="background:var(--rx-accent)"></span> VTI <strong>@VtiTotal</strong></span>
-                    <span class="d-inline-flex align-items-center gap-2"><span class="rx-dot" style="background:var(--rx-warning)"></span> VTech <strong>@VtechTotal</strong></span>
+                    <span class="d-inline-flex align-items-center gap-2"><span class="rx-dot" style="background:var(--rx-muted)"></span> VTech <strong>@VtechTotal</strong></span>
                 </div>
             </div>
         </div>
@@ -122,7 +122,7 @@
                                 <td class="font-monospace" style="font-size:.78rem">@e.DeviceId</td>
                                 <td>@e.Nombre</td>
                                 <td>@if (!string.IsNullOrWhiteSpace(e.Area)) { <span class="rx-chip">@e.Area</span> }</td>
-                                <td>@if (e.TipoSync is not null) { <span class="rx-chip @(e.TipoSync == EquipoTipo.VTI ? "rx-chip--ok" : "rx-chip--warn")">@e.TipoSync</span> }</td>
+                                <td>@if (e.TipoSync is not null) { <span class="rx-chip">@e.TipoSync</span> }</td>
                                 <td class="text-muted">@(e.UltimoContacto?.ToLocalTime().ToString("MM-dd HH:mm") ?? "—")</td>
                             </tr>
                         }
