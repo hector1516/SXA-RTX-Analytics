@@ -6,6 +6,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@500&display=swap');
 
 :root {
+  color-scheme: light;
   --rtx-navy: #1B2A4E;
   --rtx-navy-soft: #23395D;
   --rtx-blue: #3A7BD5;
@@ -19,7 +20,9 @@
   --rtx-panel: #E8EEF2;
   --rtx-panel-2: #F4F7FA;
   --rtx-text: #1E2A3A;
-  --rtx-muted: #6B7A90;
+  /* #6B7A90 quedaba en ~4.3:1 sobre blanco (por debajo del mínimo AA 4.5:1).
+     Se oscurece a #5A6A80 para cumplir contraste WCAG AA en texto secundario. */
+  --rtx-muted: #5A6A80;
   --rtx-border: #D9E2EC;
   --rtx-radius-xl: 20px;
   --rtx-radius-lg: 16px;
@@ -32,7 +35,27 @@ html, body {
   color: var(--rtx-text);
   background: linear-gradient(180deg, #F7FAFD 0%, #EEF3F9 100%);
   min-height: 100%;
+  line-height: 1.5;
 }
+
+/* Datos numéricos alineados (cifras tabulares, como el sistema usa en tablas/KPIs). */
+table, .rtx-num, .display-6 { font-variant-numeric: tabular-nums; }
+
+/* Indicador de foco de teclado visible (no depender solo del color de hover). */
+:focus-visible:not([tabindex="-1"]) {
+  outline: 2px solid var(--rtx-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* FocusOnNavigate mueve el foco al <h1> (tabindex="-1") para lectores de pantalla;
+   ese foco es programático y no debe dibujar ningún contorno. */
+[tabindex="-1"]:focus, [tabindex="-1"]:focus-visible { outline: none; }
+
+/* Áreas de pulsación cómodas (mínimo recomendado ~44px en controles principales). */
+.btn { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+.btn-sm { min-height: 36px; }
+.form-control, .form-select { min-height: 44px; }
+.form-control-sm, .form-select-sm { min-height: 36px; }
 
 a, .btn-link { color: var(--rtx-blue); }
 a:hover { color: var(--rtx-navy); }
@@ -191,3 +214,17 @@ a:hover { color: var(--rtx-navy); }
 .darker-border-checkbox.form-check-input { border-color: #929292; }
 .form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder { color: var(--bs-secondary-color); text-align: end; }
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder { text-align: start; }
+
+/* Accesibilidad — Reduce Motion.
+   Si el sistema pide reducir movimiento, se apagan las animaciones decorativas
+   (flotación del logo, pulso de estado) y los desplazamientos por hover. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .rtx-float, .rtx-pulse::before { animation: none !important; }
+  .card:hover, .btn-primary:hover, .btn-outline-primary:hover { transform: none !important; }
+}
