@@ -37,11 +37,13 @@
   --rx-radius-sm: 8px;
   --rx-shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 1px 3px rgba(16, 24, 40, .06);
 
-  /* Barra lateral */
-  --rx-sidebar-bg: #101319;
-  --rx-sidebar-border: rgba(255, 255, 255, .08);
-  --rx-sidebar-text: rgba(255, 255, 255, .68);
-  --rx-sidebar-text-strong: #FFFFFF;
+  /* Barra lateral: cristal translúcido que se adapta al tema */
+  --rx-sidebar-bg: rgba(255, 255, 255, .62);
+  --rx-sidebar-border: rgba(15, 23, 42, .08);
+  --rx-sidebar-text: rgba(15, 23, 42, .72);
+  --rx-sidebar-text-strong: #0F172A;
+  --rx-sidebar-hover: rgba(15, 23, 42, .05);
+  --rx-sidebar-active: rgba(47, 107, 224, .12);
 
   /* Compatibilidad: se mantienen los nombres --rtx-* que usan las páginas,
      remapeados a la paleta minimalista. */
@@ -88,7 +90,12 @@
   --rx-warning-soft: #2A2110;
   --rx-danger: #F87171;
   --rx-danger-soft: #2A1414;
-  --rx-sidebar-bg: #0B0D12;
+  --rx-sidebar-bg: rgba(18, 21, 28, .60);
+  --rx-sidebar-border: rgba(255, 255, 255, .08);
+  --rx-sidebar-text: rgba(255, 255, 255, .70);
+  --rx-sidebar-text-strong: #FFFFFF;
+  --rx-sidebar-hover: rgba(255, 255, 255, .06);
+  --rx-sidebar-active: rgba(91, 141, 239, .18);
   --rtx-navy: #F3F4F6;
   --rtx-navy-soft: #D1D5DB;
   --rtx-honey: #FBBF24;
@@ -98,7 +105,7 @@
 html, body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   color: var(--rx-text);
-  background: var(--rx-bg);
+  background: radial-gradient(1100px 600px at 100% 0%, var(--rx-accent-soft), transparent 55%), var(--rx-bg);
   min-height: 100%;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
@@ -271,8 +278,8 @@ h3, h4 { font-weight: 650; }
   border: 1px solid transparent;
   transition: background-color .12s ease, color .12s ease;
 }
-.rtx-navlink:hover { background: rgba(255, 255, 255, .06); color: var(--rx-sidebar-text-strong) !important; }
-.rtx-navlink.active { background: rgba(255, 255, 255, .1); color: var(--rx-sidebar-text-strong) !important; }
+.rtx-navlink:hover { background: var(--rx-sidebar-hover); color: var(--rx-sidebar-text-strong) !important; }
+.rtx-navlink.active { background: var(--rx-sidebar-active); color: var(--rx-sidebar-text-strong) !important; }
 .rtx-nav-icon { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; color: currentColor; }
 .rtx-nav-icon svg { width: 18px; height: 18px; }
 

@@ -8,29 +8,35 @@
 @inject IJSRuntime JS
 
 <div class="page">
-    <div class="sidebar">
-        <NavMenu />
+    <div class="sidebar @(_sidebarCollapsed ? "is-collapsed" : "")">
+        <NavMenu Collapsed="_sidebarCollapsed" />
     </div>
 
     <main>
         <div class="top-row px-4 rtx-topbar">
-            <span class="rx-chip rx-chip--ok me-auto"><span class="rx-dot"></span> En línea</span>
-            <AuthorizeView>
-                <Authorized>
-                    <div class="d-flex align-items-center gap-3">
-                        <span class="d-inline-flex align-items-center gap-2 small">
-                            <span style="width:30px;height:30px;border-radius:50%;background:var(--rx-accent-soft);color:var(--rx-accent-strong);display:grid;place-items:center;font-weight:700;font-size:.8rem">@Initial(context.User.Identity?.Name)</span>
-                            <span class="fw-semibold">@context.User.Identity?.Name</span>
-                            <span class="rx-chip">@Role(context)</span>
-                        </span>
-                        <a href="/logout" class="btn btn-sm btn-outline-secondary"><Icon Name="logout" Size="16" /> Salir</a>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="ToggleTheme" title="Cambiar tema claro/oscuro" aria-label="Cambiar tema"><Icon Name="theme" Size="16" /></button>
-                    </div>
-                </Authorized>
-                <NotAuthorized>
-                    <a href="/login" class="btn btn-sm btn-primary">Entrar</a>
-                </NotAuthorized>
-            </AuthorizeView>
+            <button class="btn btn-sm btn-outline-secondary d-none d-md-inline-flex" @onclick="ToggleSidebar"
+                    title="Colapsar menú" aria-label="Colapsar menú">
+                <Icon Name="panel" Size="16" />
+            </button>
+            <div class="ms-auto d-flex align-items-center gap-3">
+                <span class="rx-chip rx-chip--ok"><span class="rx-dot"></span> En línea</span>
+                <AuthorizeView>
+                    <Authorized>
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="d-inline-flex align-items-center gap-2 small">
+                                <span style="width:30px;height:30px;border-radius:50%;background:var(--rx-accent-soft);color:var(--rx-accent-strong);display:grid;place-items:center;font-weight:700;font-size:.8rem">@Initial(context.User.Identity?.Name)</span>
+                                <span class="fw-semibold d-none d-sm-inline">@context.User.Identity?.Name</span>
+                                <span class="rx-chip d-none d-lg-inline-flex">@Role(context)</span>
+                            </span>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="ToggleTheme" title="Cambiar tema claro/oscuro" aria-label="Cambiar tema"><Icon Name="theme" Size="16" /></button>
+                            <a href="/logout" class="btn btn-sm btn-outline-secondary"><Icon Name="logout" Size="16" /> <span class="d-none d-sm-inline">Salir</span></a>
+                        </div>
+                    </Authorized>
+                    <NotAuthorized>
+                        <a href="/login" class="btn btn-sm btn-primary">Entrar</a>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
         </div>
 
         <article class="content px-4">
@@ -100,6 +106,19 @@
         try { await JS.InvokeVoidAsync("rxToggleTheme"); } catch { }
     }
 
+    bool _sidebarCollapsed;
+
+    async Task ToggleSidebar()
+    {
+        _sidebarCollapsed = !_sidebarCollapsed;
+        try { await JS.InvokeVoidAsync("eval", $"localStorage.setItem('rx-sidebar-collapsed','{(_sidebarCollapsed ? "1" : "0")}')"); } catch { }
+    }
+
+    async Task LoadSidebarState()
+    {
+        try { _sidebarCollapsed = await JS.InvokeAsync<bool>("eval", "localStorage.getItem('rx-sidebar-collapsed')==='1'"); } catch { }
+    }
+
     // Convierte el markdown del release (titulos, tablas, negritas, codigo) a texto plano legible.
     string PrettyChangelog(string? md)
     {
@@ -152,6 +171,7 @@
     {
         if (_initialized) return;
         _initialized = true;
+        await LoadSidebarState();
         await EnforcePasswordChange();
         await LoadUpdateInterval();
         await RefreshVersionAndUpdates(initial: true);

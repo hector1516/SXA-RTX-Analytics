@@ -7,14 +7,19 @@
 main { flex: 1; display: flex; flex-direction: column; }
 article { flex: 1; }
 
-/* Barra lateral: neutra y oscura, un solo tono. */
+/* Barra lateral: cristal translúcido (se adapta al tema por variables). */
 .sidebar {
   background: var(--rx-sidebar-bg);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
   border-right: 1px solid var(--rx-sidebar-border);
+  transition: width .18s ease;
 }
 
 .rtx-topbar {
-  background: var(--rx-surface);
+  background: color-mix(in srgb, var(--rx-surface) 82%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--rx-border);
   position: sticky;
   top: 0;
@@ -39,5 +44,6 @@ article { flex: 1; }
 @media (min-width: 641px) {
   .page { flex-direction: row; }
   .sidebar { width: 248px; height: 100vh; position: sticky; top: 0; overflow: hidden; }
+  .sidebar.is-collapsed { width: 72px; }
   .top-row, article, footer { padding-left: 2rem !important; padding-right: 2rem !important; }
 }
