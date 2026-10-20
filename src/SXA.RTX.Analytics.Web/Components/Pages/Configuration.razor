@@ -19,7 +19,7 @@
         <h2 class="mb-1" style="font-weight:800; letter-spacing:-.02em">Configuración</h2>
         <div class="text-muted small">SQL Server (solo lectura) • MAPICS (ODBC) • Almacenamiento local • Equipos • Tablas y fuentes</div>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex flex-wrap align-items-center gap-2">
         <span class="rtx-pill rtx-pill--sky">SQL solo lectura</span>
         <span class="rtx-pill rtx-pill--honey">DeviceId PC-...</span>
     </div>
@@ -39,7 +39,7 @@
     <div class="card">
         <div class="card-body">
             <h5 class="card-title">SQL Server — conexión de la plataforma</h5>
-            <p class="text-muted small">Única base de datos: guarda la configuración de la app (<code>SXA_RTX_*</code>) y contiene las tablas operativas VTI/VTech que consulta <code>/query</code>. También se usa para leer el catálogo <code>dbo.SXA_PCs</code>.</p>
+            <p class="text-muted small">Conexión de <strong>solo lectura</strong> a la base de producción: contiene las tablas operativas VTI/VTech que consulta <code>/query</code> y el catálogo <code>dbo.SXA_PCs</code>. La configuración de la app se guarda localmente (SQLite), no en esta base.</p>
             <div class="row g-3">
                 <div class="col-md-6"><label class="form-label">Servidor</label><input class="form-control" @bind="SqlServer" placeholder="10.96.16.114" /></div>
                 <div class="col-md-3"><label class="form-label">Autenticación</label><select class="form-select" @bind="SqlAuth"><option value="sql">SQL Server</option><option value="win">Windows</option></select></div>
@@ -49,9 +49,9 @@
                 <div class="col-md-3"><label class="form-label">Contraseña</label><input type="password" class="form-control" @bind="SqlPassword" disabled="@(SqlAuth=="win")" /></div>
                 <div class="col-12"><label class="form-label">Cadena resultante (la contraseña no se muestra)</label><input class="form-control font-monospace small" value="@BuildSqlConnectionString()" readonly /></div>
             </div>
-            <div class="d-flex gap-2 mt-3 flex-wrap">
-                <button class="btn btn-primary" @onclick="TestSql" disabled="@IsTestingSql">@if (IsTestingSql) { <span class="spinner-border spinner-border-sm"></span> @(" Probando...") } else { @("Probar conexión") }</button>
-                <button class="btn btn-outline-primary" @onclick="LoadDatabases" disabled="@(!SqlTestOk)">Cargar bases (carpetas)</button>
+            <div class="d-flex gap-2 mt-3 flex-wrap align-items-center">
+                <button class="btn btn-outline-primary" @onclick="TestSql" disabled="@IsTestingSql">@if (IsTestingSql) { <span class="spinner-border spinner-border-sm"></span> @(" Probando...") } else { @("Probar conexión") }</button>
+                <button class="btn btn-outline-secondary" @onclick="LoadDatabases" disabled="@(!SqlTestOk)">Cargar bases (carpetas)</button>
                 <button class="btn btn-primary" @onclick="SaveConnections" disabled="@IsSavingConnections">@if (IsSavingConnections) { <span class="spinner-border spinner-border-sm"></span> @(" Guardando...") } else { @("Guardar conexión") }</button>
                 <button class="btn btn-outline-secondary" @onclick="async () => { ActiveTab=3; await LoadEquipos(); }">Ir a Equipos →</button>
             </div>
@@ -68,7 +68,7 @@ else if (ActiveTab == 1)
             <h5 class="card-title">MAPICS — ODBC</h5>
             <p class="text-muted small">Dataset ODBC para MAPICS. Se usará <code>OdbcDataSourceProvider</code>.</p>
             <label class="form-label">Cadena ODBC</label><input class="form-control font-monospace small" @bind="OdbcConnectionString" placeholder="DSN=MAPICS;UID=...;PWD=...;" />
-            <div class="d-flex gap-2 mt-3"><button class="btn btn-primary" @onclick="TestOdbc" disabled="@IsTestingOdbc">@if (IsTestingOdbc) { <span class="spinner-border spinner-border-sm"></span> @(" Probando...") } else { @("Probar ODBC") }</button></div>
+            <div class="d-flex flex-wrap align-items-center gap-2 mt-3"><button class="btn btn-primary" @onclick="TestOdbc" disabled="@IsTestingOdbc">@if (IsTestingOdbc) { <span class="spinner-border spinner-border-sm"></span> @(" Probando...") } else { @("Probar ODBC") }</button></div>
             @if (!string.IsNullOrEmpty(OdbcTestMsg)) { <div class="alert @(OdbcTestOk ? "alert-success" : "alert-danger") mt-3 py-2 small">@OdbcTestMsg</div> }
         </div>
     </div>
@@ -112,7 +112,7 @@ else if (ActiveTab == 3)
                 </div>
                 <div class="col-md-3"><label class="form-label">Nombre</label><input class="form-control" @bind="EqNombre" placeholder="Ej. Línea 3 - Celda 1" /></div>
                 <div class="col-md-3"><label class="form-label">Área</label><input class="form-control" @bind="EqArea" placeholder="Ej. Producción / HVAC" list="areasList" /><datalist id="areasList">@foreach (var a in Areas.Distinct()) { <option value="@a"></option> }</datalist></div>
-                <div class="col-12 d-flex gap-2">
+                <div class="col-12 d-flex flex-wrap align-items-center gap-2">
                     <button class="btn btn-primary" @onclick="SaveEquipo" disabled="@IsSavingEquipo">@if (IsSavingEquipo) { <span class="spinner-border spinner-border-sm"></span> } else { @("Guardar") }</button>
                     <button class="btn btn-outline-secondary" @onclick="LoadEquipos">Recargar</button>
                 </div>
@@ -132,7 +132,7 @@ else if (ActiveTab == 3)
                                 <div class="table-responsive"><table class="table table-sm small mb-0"><thead><tr><th>DeviceId</th><th>Nombre</th><th>Área</th><th></th></tr></thead><tbody>
                                     @foreach (var e in GetEquiposByTipo(tipo, true))
                                     {
-                                        <tr><td class="font-monospace" style="font-size:.75rem">@e.DeviceId</td><td>@e.Nombre</td><td><span class="badge bg-light text-dark border">@e.Area</span></td><td><button class="btn btn-sm btn-outline-primary py-0" @onclick="() => { EqDeviceId=e.DeviceId; EqNombre=e.Nombre; EqArea=e.Area; }">Editar</button></td></tr>
+                                        <tr><td class="font-monospace" style="font-size:.75rem">@e.DeviceId</td><td>@e.Nombre</td><td><span class="badge bg-light text-dark border">@e.Area</span></td><td><button class="btn btn-xs btn-outline-primary" @onclick="() => { EqDeviceId=e.DeviceId; EqNombre=e.Nombre; EqArea=e.Area; }">Editar</button></td></tr>
                                     }
                                     @if (!GetEquiposByTipo(tipo, true).Any()) { <tr><td colspan="4" class="text-center text-muted py-2">Sin equipos con nombre</td></tr> }
                                 </tbody></table></div>
@@ -142,7 +142,7 @@ else if (ActiveTab == 3)
                                 <div class="table-responsive"><table class="table table-sm small mb-0"><thead><tr><th>DeviceId</th><th>NombrePC sync</th><th></th></tr></thead><tbody>
                                     @foreach (var c in GetCatalogByTipo(tipo, false))
                                     {
-                                        <tr><td class="font-monospace" style="font-size:.75rem">@c.DeviceId</td><td class="text-muted">@c.NombrePC</td><td><button class="btn btn-sm btn-outline-primary py-0" @onclick="() => EqDeviceId=c.DeviceId">Asignar</button></td></tr>
+                                        <tr><td class="font-monospace" style="font-size:.75rem">@c.DeviceId</td><td class="text-muted">@c.NombrePC</td><td><button class="btn btn-xs btn-outline-primary" @onclick="() => EqDeviceId=c.DeviceId">Asignar</button></td></tr>
                                     }
                                     @if (!GetCatalogByTipo(tipo, false).Any()) { <tr><td colspan="3" class="text-center text-muted py-2">Todos con nombre ✓</td></tr> }
                                 </tbody></table></div>
@@ -161,9 +161,9 @@ else if (ActiveTab == 4)
             <h5 class="card-title">Tablas y fuentes</h5>
             <p class="text-muted small">Marca las tablas que usa Analytics, asígnalas a una <strong>fuente</strong> (VTI, Packout, Cajas, Producción...), ponles título y nickname a las columnas, e indica qué columna es el <strong>número de serie</strong> y cuál la <strong>fecha</strong> (para la línea de tiempo).</p>
             <div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
-                <button class="btn btn-primary btn-sm" @onclick="LoadTablas" disabled="@IsLoadingTablas">@if (IsLoadingTablas) { <span class="spinner-border spinner-border-sm"></span> } else { @("Cargar tablas") }</button>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="LoadTablas" disabled="@IsLoadingTablas">@if (IsLoadingTablas) { <span class="spinner-border spinner-border-sm"></span> } else { @("Cargar tablas") }</button>
                 <button class="btn btn-primary btn-sm" @onclick="SaveTablas" disabled="@IsSavingTablas">Guardar</button>
-                <span class="text-muted small">@SelectedCount() tabla(s) seleccionada(s)</span>
+                <span class="text-muted small ms-1">@SelectedCount() tabla(s) seleccionada(s)</span>
             </div>
             @if (!string.IsNullOrEmpty(TablasMsg)) { <div class="alert @(TablasOk?"alert-success":"alert-danger") py-2 small">@TablasMsg</div> }
             @if (AllTables.Count == 0) { <div class="text-muted small">Pulsa “Cargar tablas” (usa la cadena SQL de la pestaña SQL Server).</div> }
@@ -237,7 +237,7 @@ else if (ActiveTab == 5)
         <div class="card-body">
             <h5 class="card-title">Import / Export — respaldo de configuración</h5>
             <p class="text-muted small">Descarga toda la configuración (<code>Equipos, Tablas VTI/VTech, Tablas sistema, ApplicationSettings, Usuarios</code>) en un JSON. Cada nueva sección que agreguemos se incluirá automáticamente aquí.</p>
-            <div class="d-flex flex-wrap gap-2">
+            <div class="d-flex flex-wrap align-items-center gap-2">
                 <button class="btn btn-primary" @onclick="Exportar" disabled="@IsExporting">@if (IsExporting) { <span class="spinner-border spinner-border-sm"></span> @(" Exportando...") } else { @("Descargar JSON") }</button>
                 <label class="btn btn-outline-primary mb-0">
                     Cargar JSON <InputFile OnChange="Importar" accept=".json" style="display:none" />

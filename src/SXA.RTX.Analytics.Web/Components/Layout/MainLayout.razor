@@ -15,7 +15,7 @@
 
     <main>
         <div class="top-row px-4 rtx-topbar">
-            <button class="btn btn-sm btn-outline-secondary d-none d-md-inline-flex" @onclick="ToggleSidebar"
+            <button class="btn btn-sm btn-outline-secondary rx-btn-icon d-none d-md-inline-flex" @onclick="ToggleSidebar"
                     title="Colapsar menú" aria-label="Colapsar menú">
                 <Icon Name="panel" Size="16" />
             </button>
@@ -29,7 +29,7 @@
                                 <span class="fw-semibold d-none d-sm-inline">@context.User.Identity?.Name</span>
                                 <span class="rx-chip d-none d-lg-inline-flex">@Role(context)</span>
                             </span>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="ToggleTheme" title="Cambiar tema claro/oscuro" aria-label="Cambiar tema"><Icon Name="theme" Size="16" /></button>
+                            <button class="btn btn-sm btn-outline-secondary rx-btn-icon" @onclick="ToggleTheme" title="Cambiar tema claro/oscuro" aria-label="Cambiar tema"><Icon Name="theme" Size="16" /></button>
                             <a href="/logout" class="btn btn-sm btn-outline-secondary"><Icon Name="logout" Size="16" /> <span class="d-none d-sm-inline">Salir</span></a>
                         </div>
                     </Authorized>
@@ -69,10 +69,10 @@
                 <h5 class="fw-bold">Actualización disponible — v@(LatestVersion)</h5>
                 <p class="small text-muted">Versión actual v@(Version). Hay una nueva versión con cambios:</p>
                 <pre class="small bg-light border rounded p-2" style="max-height:220px; overflow:auto; white-space:pre-wrap">@PrettyChangelog(Changelog)</pre>
-                <div class="d-flex gap-2 justify-content-end">
+                <div class="d-flex flex-wrap align-items-center gap-2 justify-content-end">
                     <button class="btn btn-outline-secondary btn-sm" @onclick="() => ShowUpdateAdmin=false">Recordar más tarde</button>
-                    <a href="@UpdateUrl" target="_blank" class="btn btn-primary btn-sm">Ver release</a>
-                    <a href="@UpdateUrl" target="_blank" class="btn btn-success btn-sm" @onclick="() => ShowUpdateAdmin=false">Actualizar</a>
+                    <a href="@UpdateUrl" target="_blank" class="btn btn-outline-primary btn-sm">Ver release</a>
+                    <a href="@UpdateUrl" target="_blank" class="btn btn-primary btn-sm" @onclick="() => ShowUpdateAdmin=false">Actualizar</a>
                 </div>
             </div>
         </div>

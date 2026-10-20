@@ -23,7 +23,6 @@
             <div class="col-md-8 col-lg-9">
                 <label class="form-label small fw-bold">Número de serie</label>
                 <input class="form-control font-monospace" @bind="Serial" @bind:event="oninput" placeholder="Ej. MY26L083473" @onkeydown="OnKey" />
-                <div class="form-text">Busca en todas las fuentes y tablas configuradas.</div>
             </div>
             <div class="col-md-4 col-lg-3">
                 <button class="btn btn-primary w-100" @onclick="Buscar" disabled="@IsSearching">
@@ -31,6 +30,7 @@
                 </button>
             </div>
         </div>
+        <div class="form-text mt-2">Busca en todas las fuentes y tablas configuradas.</div>
         @if (!string.IsNullOrEmpty(Msg)) { <div class="alert alert-danger mt-3 py-2 small mb-0">@Msg</div> }
     </div>
 </div>
@@ -66,11 +66,11 @@
             <div class="card-header d-flex flex-wrap gap-2 justify-content-between align-items-center">
                 <span>Línea de tiempo <span class="text-muted small">· @Serial</span></span>
                 <div class="d-flex gap-2 align-items-center">
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="ZoomOut" title="Alejar" aria-label="Alejar">−</button>
-                    <input type="range" min="1" max="40" step="0.5" @bind="Zoom" @bind:event="oninput" style="width:130px" title="Zoom" />
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="ZoomIn" title="Acercar" aria-label="Acercar">+</button>
+                    <button class="btn btn-sm btn-outline-secondary rx-btn-icon" @onclick="ZoomOut" title="Alejar" aria-label="Alejar">−</button>
+                    <input type="range" min="1" max="40" step="0.5" @bind="Zoom" @bind:event="oninput" style="width:130px;margin:0" title="Zoom" />
+                    <button class="btn btn-sm btn-outline-secondary rx-btn-icon" @onclick="ZoomIn" title="Acercar" aria-label="Acercar">+</button>
                     <button class="btn btn-sm btn-outline-secondary" @onclick="Fit" title="Ajustar">Ajustar</button>
-                    <span class="small text-muted" style="min-width:44px">@Zoom.ToString("0.0")x</span>
+                    <span class="small text-muted" style="min-width:44px;text-align:right">@Zoom.ToString("0.0")x</span>
                 </div>
             </div>
             <div class="card-body">

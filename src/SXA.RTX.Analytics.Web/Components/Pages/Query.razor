@@ -1,4 +1,4 @@
-@page "/query"
+﻿@page "/query"
 @attribute [Authorize]
 @using Microsoft.AspNetCore.Authorization
 @using SXA.RTX.Analytics.Application.Abstractions
@@ -35,7 +35,7 @@
                     @foreach (var f in Fuentes) { <option value="@f">@f</option> }
                 </select>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-9">
                 <label class="form-label small fw-bold">Tabla</label>
                 <select class="form-select form-select-sm" @bind="SelectedTable" @bind:after="OnTableChanged">
                     <option value="">— selecciona —</option>
@@ -43,12 +43,13 @@
                 </select>
                 <div class="form-text"><a href="#" @onclick:preventDefault="true" @onclick="LoadTablas">Recargar tablas</a> (@TablasFiltradas.Count)</div>
             </div>
-            <div class="col-md-5 d-flex align-items-end gap-2">
-                <button class="btn btn-primary btn-sm" @onclick="Ejecutar" disabled="@IsRunning">@if (IsRunning) { <span class="spinner-border spinner-border-sm"></span> } else { <Icon Name="check" Size="16" /> } Ejecutar</button>
-                <button class="btn btn-outline-primary btn-sm" @onclick="ExportCsv" disabled="@(Result==null)" style="min-width:100px"><Icon Name="list" Size="16" /> CSV</button>
-                <button class="btn btn-outline-primary btn-sm" @onclick="ExportExcel" disabled="@(Result==null)" style="min-width:104px"><Icon Name="sheet" Size="16" /> Excel</button>
-                <button class="btn btn-outline-primary btn-sm" @onclick="ExportPdf" disabled="@(Result==null)" style="min-width:104px"><Icon Name="file-pdf" Size="16" /> PDF</button>
-            </div>
+        </div>
+
+        <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+            <button class="btn btn-primary btn-sm" @onclick="Ejecutar" disabled="@IsRunning" style="min-width:112px">@if (IsRunning) { <span class="spinner-border spinner-border-sm"></span> } else { <Icon Name="check" Size="16" /> } Ejecutar</button>
+            <button class="btn btn-outline-primary btn-sm" @onclick="ExportCsv" disabled="@(Result==null)" style="min-width:104px"><Icon Name="list" Size="16" /> CSV</button>
+            <button class="btn btn-outline-primary btn-sm" @onclick="ExportExcel" disabled="@(Result==null)" style="min-width:104px"><Icon Name="sheet" Size="16" /> Excel</button>
+            <button class="btn btn-outline-primary btn-sm" @onclick="ExportPdf" disabled="@(Result==null)" style="min-width:104px"><Icon Name="file-pdf" Size="16" /> PDF</button>
         </div>
 
         @if (Columns.Count>0)

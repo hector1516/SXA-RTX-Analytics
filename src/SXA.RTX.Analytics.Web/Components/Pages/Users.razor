@@ -1,4 +1,4 @@
-@page "/users"
+﻿@page "/users"
 @attribute [Authorize(Roles = "Administrador")]
 @using Microsoft.AspNetCore.Authorization
 @using SXA.RTX.Analytics.Application.Abstractions
@@ -19,7 +19,7 @@
             <div class="col-md-2"><label class="form-label small">Activo</label><select class="form-select" @bind="FormActive"><option value="true">Sí</option><option value="false">No</option></select></div>
             <div class="col-md-2"><label class="form-label small">Contraseña @(EditingId==null ? "" : "(vacío = no cambia)")</label><input type="password" class="form-control" @bind="FormPassword" placeholder="••••••••" /></div>
         </div>
-        <div class="d-flex gap-2 mt-3">
+        <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
             <button class="btn btn-primary" @onclick="Save" disabled="@IsSaving">@if (IsSaving) { <span class="spinner-border spinner-border-sm"></span> } else { @(EditingId==null ? "Crear" : "Guardar") }</button>
             @if (EditingId!=null) { <button class="btn btn-outline-secondary" @onclick="Cancel">Cancelar</button> }
         </div>
@@ -38,10 +38,10 @@
                 {
                     <tr>
                         <td class="font-monospace">@u.Username</td><td>@u.DisplayName</td><td><span class="badge @(u.Role==AppRole.Administrador?"bg-primary":"bg-secondary")">@u.Role</span></td><td>@(u.IsActive?"Sí":"No")</td><td>@u.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd")</td>
-                        <td class="d-flex gap-1">
-                            <button class="btn btn-sm btn-outline-primary py-0" @onclick="() => Edit(u)">Editar</button>
-                            <button class="btn btn-sm btn-outline-danger py-0" @onclick="() => Delete(u.Id)">Borrar</button>
-                        </td>
+                        <td><div class="d-flex gap-1 justify-content-end">
+                            <button class="btn btn-xs btn-outline-primary" @onclick="() => Edit(u)">Editar</button>
+                            <button class="btn btn-xs btn-outline-danger" @onclick="() => Delete(u.Id)">Borrar</button>
+                        </div></td>
                     </tr>
                 }
             </tbody></table></div>

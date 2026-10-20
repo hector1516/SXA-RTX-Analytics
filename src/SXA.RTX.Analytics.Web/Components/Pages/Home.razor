@@ -42,28 +42,28 @@
         <div class="card h-100"><div class="card-body rx-kpi">
             <span class="rx-kpi__label">VTI en línea</span>
             <span class="rx-kpi__value">@VtiOnline <small>/ @VtiTotal</small></span>
-            <span class="rx-chip @(VtiOnline > 0 ? "rx-chip--ok" : "rx-chip--off")"><span class="rx-dot"></span> @(VtiOnline > 0 ? "En línea" : "Sin línea")</span>
+            <span class="rx-chip rx-kpi__foot @(VtiOnline > 0 ? "rx-chip--ok" : "rx-chip--off")"><span class="rx-dot"></span> @(VtiOnline > 0 ? "En línea" : "Sin línea")</span>
         </div></div>
     </div>
     <div class="col-6 col-lg-3">
         <div class="card h-100"><div class="card-body rx-kpi">
             <span class="rx-kpi__label">VTech en línea</span>
             <span class="rx-kpi__value">@VtechOnline <small>/ @VtechTotal</small></span>
-            <span class="rx-chip @(VtechOnline > 0 ? "rx-chip--ok" : "rx-chip--off")"><span class="rx-dot"></span> @(VtechOnline > 0 ? "En línea" : "Sin línea")</span>
+            <span class="rx-chip rx-kpi__foot @(VtechOnline > 0 ? "rx-chip--ok" : "rx-chip--off")"><span class="rx-dot"></span> @(VtechOnline > 0 ? "En línea" : "Sin línea")</span>
         </div></div>
     </div>
     <div class="col-6 col-lg-3">
         <div class="card h-100"><div class="card-body rx-kpi">
             <span class="rx-kpi__label">Equipos configurados</span>
             <span class="rx-kpi__value">@EquiposCount</span>
-            <a href="/configuration" class="small text-decoration-none">Administrar equipos →</a>
+            <a href="/configuration" class="rx-kpi__foot small text-decoration-none">Administrar equipos →</a>
         </div></div>
     </div>
     <div class="col-6 col-lg-3">
         <div class="card h-100"><div class="card-body rx-kpi">
             <span class="rx-kpi__label">Tablas habilitadas</span>
             <span class="rx-kpi__value">@TablasCount</span>
-            <a href="/configuration" class="small text-decoration-none">Tablas VTI/VTech →</a>
+            <a href="/configuration" class="rx-kpi__foot small text-decoration-none">Tablas VTI/VTech →</a>
         </div></div>
     </div>
 </div>

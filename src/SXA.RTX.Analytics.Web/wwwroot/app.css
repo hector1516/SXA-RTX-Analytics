@@ -1,4 +1,4 @@
-/* SXA-RTX Analytics — Tema minimalista
+﻿/* SXA-RTX Analytics — Tema minimalista
    Basado en los principios de diseño (simplicidad, jerarquía, color con moderación):
    - Un único color de acento (azul ECCSA). El color se reserva para estado y acción.
    - Superficies neutras, bordes sutiles y sombras casi imperceptibles.
@@ -133,9 +133,27 @@ a:hover { color: var(--rx-accent-strong); }
   display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
   border-radius: var(--rx-radius-sm);
   font-weight: 600;
+  white-space: nowrap;
   transition: background-color .12s ease, border-color .12s ease, color .12s ease;
 }
+.btn > svg { flex: 0 0 auto; }
 .btn-sm { min-height: 36px; border-radius: var(--rx-radius-sm); }
+.btn:disabled, .btn.disabled { opacity: .55; cursor: not-allowed; }
+
+/* Botón de solo icono: cuadrado y centrado */
+.btn.rx-btn-icon { width: 44px; padding-left: 0; padding-right: 0; }
+.btn-sm.rx-btn-icon { width: 36px; }
+
+/* Acciones dentro de tablas (compactas pero alineadas) */
+.btn-xs {
+  min-height: 30px;
+  padding: .15rem .55rem;
+  font-size: .78rem;
+  gap: .35rem;
+  border-radius: 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+  white-space: nowrap;
+}
 
 .btn-primary {
   background: var(--rx-accent);
@@ -243,10 +261,13 @@ h3, h4 { font-weight: 650; }
 /* --- Encabezado de página ------------------------------------------------ */
 .rx-page-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; }
 .rx-page-head h1 { font-size: 1.6rem; margin-bottom: .15rem; }
+.rx-page-head .rx-chip { min-height: 36px; }
 .rx-eyebrow { font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--rx-muted); }
 
 /* --- KPIs ---------------------------------------------------------------- */
-.rx-kpi { display: flex; flex-direction: column; gap: .35rem; }
+.rx-kpi { display: flex; flex-direction: column; gap: .35rem; height: 100%; }
+.rx-kpi__foot { margin-top: auto; }
+.rx-kpi a.small { display: inline-flex; align-items: center; min-height: 26px; }
 .rx-kpi__label { font-size: .75rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--rx-muted); }
 .rx-kpi__value { font-size: 1.9rem; font-weight: 700; line-height: 1.1; letter-spacing: -.02em; }
 .rx-kpi__value small { font-size: .95rem; font-weight: 500; color: var(--rx-muted); }
