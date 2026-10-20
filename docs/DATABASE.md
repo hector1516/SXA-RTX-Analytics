@@ -1,12 +1,23 @@
-# DATABASE — SXA-RTX Analytics
+﻿# DATABASE - SXA-RTX Analytics
 
+> **Arquitectura de datos (desde v1.2.1)**
+>
+> - **SQL Server de producción (`hussmann_Insight`) = SOLO LECTURA.** La aplicación únicamente
+>   ejecuta `SELECT`; nunca crea, altera ni escribe tablas en esa base.
+> - **La configuración de la plataforma vive en SQLite local**:
+>   `data/sxa-config.db`, junto a la aplicación. Contiene usuarios, fuentes, títulos,
+>   nicknames, relaciones de detalle, ajustes y las cadenas de conexión (cifradas con DPAPI).
+> - El esquema SQLite se crea automáticamente al arrancar (`EnsureCreated`). Para respaldar o
+>   mover la configuración usa **Import/Export** en `/configuration`.
+> - La semilla inicial (12 tablas/fuentes y la relación de pruebas VTI) solo se aplica si la
+>   configuración está vacía y se puede editar/borrar en `/configuration`.
 ## Bases
-- `SXA_RTX_Analytics` - **configuración** propia de la plataforma. Creada y migrada por la app.
-- Base **operacional** (SQL Server de negocio con las tablas VTI/VTech) - **solo lectura**, nunca migrada por esta app. Se configura aparte en `/configuration` o con `ConnectionStrings__OperationalDatabase`.
-- `dbo.SXA_PCs` - catálogo de equipos del central de `SXA-RTX-Sync` (NombrePC, TipoMaquina, UltimoContacto). Solo lectura.
-- MAPICS vía ODBC - **solo lectura**.
+- **SQL Server de producción** (`hussmann_Insight`) — **solo lectura**. De aquí salen las consultas, reportes, gráficas y la trazabilidad (`SELECT` únicamente).
+- `dbo.SXA_PCs` — catálogo de equipos del central de `SXA-RTX-Sync`. Solo lectura.
+- **SQLite local** (`data/sxa-config.db`) — configuración de la plataforma (usuarios, fuentes, títulos, nicknames, relaciones de detalle, ajustes y conexiones cifradas con DPAPI).
+- MAPICS vía ODBC — **solo lectura**.
 
-Separación estricta: nunca mezclar configuración con datos operacionales.
+La base de producción **nunca** se modifica.
 
 ## Conexiones y precedencia
 

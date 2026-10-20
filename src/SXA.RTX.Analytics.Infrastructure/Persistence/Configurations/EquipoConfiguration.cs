@@ -30,6 +30,14 @@ public sealed class TablaConfigConfiguration : IEntityTypeConfiguration<TablaCon
         b.Property(x => x.DisplayName).HasMaxLength(200);
         b.Property(x => x.SerialColumn).HasMaxLength(200);
         b.Property(x => x.DateColumn).HasMaxLength(200);
+        b.Property(x => x.DetailTable).HasMaxLength(200);
+        b.Property(x => x.DetailForeignKey).HasMaxLength(200);
+        b.Property(x => x.DetailParentKey).HasMaxLength(200);
+        b.Property(x => x.DetailDateColumn).HasMaxLength(200);
+        b.Property(x => x.DetailTitleColumn).HasMaxLength(200);
+        b.Property(x => x.DetailResultColumn).HasMaxLength(200);
+        b.Property(x => x.DetailValueColumn).HasMaxLength(200);
+        b.Property(x => x.DetailUnitsColumn).HasMaxLength(200);
         b.HasMany(x => x.Columnas)
             .WithOne()
             .HasForeignKey(x => x.TablaConfigId)

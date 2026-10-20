@@ -131,7 +131,10 @@ public sealed class TablasConfigService : ITablasConfigService
                 x.Columnas
                     .OrderBy(c => c.ColumnName, StringComparer.OrdinalIgnoreCase)
                     .Select(c => new TablaColumnaDto(c.ColumnName, string.IsNullOrWhiteSpace(c.DisplayName) ? null : c.DisplayName))
-                    .ToList()))
+                    .ToList(),
+                string.IsNullOrWhiteSpace(x.DetailTable) ? null : new TablaDetalleDto(
+                    x.DetailTable, x.DetailForeignKey, x.DetailParentKey, x.DetailDateColumn,
+                    x.DetailTitleColumn, x.DetailResultColumn, x.DetailValueColumn, x.DetailUnitsColumn)))
             .ToList();
     }
 
@@ -162,6 +165,14 @@ public sealed class TablasConfigService : ITablasConfigService
                     DisplayName = string.IsNullOrWhiteSpace(sel.DisplayName) ? null : sel.DisplayName.Trim(),
                     SerialColumn = string.IsNullOrWhiteSpace(sel.SerialColumn) ? null : sel.SerialColumn.Trim(),
                     DateColumn = string.IsNullOrWhiteSpace(sel.DateColumn) ? null : sel.DateColumn.Trim(),
+                    DetailTable = string.IsNullOrWhiteSpace(sel.Detalle?.Table) ? null : sel.Detalle!.Table!.Trim(),
+                    DetailForeignKey = sel.Detalle?.ForeignKey?.Trim(),
+                    DetailParentKey = sel.Detalle?.ParentKey?.Trim(),
+                    DetailDateColumn = sel.Detalle?.DateColumn?.Trim(),
+                    DetailTitleColumn = sel.Detalle?.TitleColumn?.Trim(),
+                    DetailResultColumn = sel.Detalle?.ResultColumn?.Trim(),
+                    DetailValueColumn = sel.Detalle?.ValueColumn?.Trim(),
+                    DetailUnitsColumn = sel.Detalle?.UnitsColumn?.Trim(),
                 };
                 foreach (var col in (sel.Columnas ?? Array.Empty<TablaColumnaDto>())
                              .Where(c => !string.IsNullOrWhiteSpace(c.ColumnName))

@@ -13,24 +13,15 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("ConfigurationDatabase");
+        // La base SQL de producción es SOLO LECTURA: la app nunca crea ni modifica
+        // objetos en ella. La configuración (usuarios, fuentes, nicknames, ajustes)
+        // vive en un archivo SQLite local, junto a la aplicación.
+        var dataDir = Path.Combine(AppContext.BaseDirectory, "data");
+        Directory.CreateDirectory(dataDir);
+        var dbPath = Path.Combine(dataDir, "sxa-config.db");
 
-        // Allow startup without a real SQL Server (e.g. CI, local scaffold). Health check will report status.
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            // Fallback to in-memory for Phase 1 scaffold so the app can boot without secrets.
-            services.AddDbContext<ConfigurationDbContext>(opt =>
-                opt.UseInMemoryDatabase("SXA_RTX_Analytics_Scaffold"));
-        }
-        else
-        {
-            services.AddDbContext<ConfigurationDbContext>(opt =>
-                opt.UseSqlServer(connectionString, sql =>
-                {
-                    sql.EnableRetryOnFailure(3, TimeSpan.FromSeconds(5), null);
-                    sql.MigrationsAssembly(typeof(ConfigurationDbContext).Assembly.FullName);
-                }));
-        }
+        services.AddDbContext<ConfigurationDbContext>(opt =>
+            opt.UseSqlite($"Data Source={dbPath}"));
 
         services.AddSingleton<SecretProtector>();
         services.AddScoped<IConfigurationService, ApplicationSettingService>();
@@ -40,6 +31,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITablasConfigService, TablasConfigService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<BootstrapAdminService>();
+        services.AddScoped<ConfigSeeder>();
         services.AddScoped<IConfigExportService, ConfigExportService>();
         services.AddScoped<IDynamicQueryService, DynamicQueryService>();
         services.AddScoped<ITraceService, TraceService>();

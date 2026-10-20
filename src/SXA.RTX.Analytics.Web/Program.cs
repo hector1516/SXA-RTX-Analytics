@@ -134,16 +134,8 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<ConfigurationDbContext>();
+        // La configuración vive en SQLite local (la base SQL de producción es solo lectura).
         await db.Database.EnsureCreatedAsync();
-
-        // En SQL Server real (base ya existente), EnsureCreated NO crea tablas faltantes:
-        // se crean aquí las SXA_RTX_* que no existan.
-        if (db.Database.IsRelational())
-        {
-            var tables = scope.ServiceProvider.GetRequiredService<SXA.RTX.Analytics.Application.Abstractions.ISystemTableService>();
-            var (ok, msg) = await tables.CreateAllMissingAsync();
-            if (!ok) Log.Warning("Tablas del sistema: {Msg}", msg);
-        }
 
         // Superadmin: primer arranque crea el por defecto; ResetPassword permite recuperarlo.
         var bootstrap = scope.ServiceProvider.GetRequiredService<SXA.RTX.Analytics.Infrastructure.Services.BootstrapAdminService>();
@@ -155,6 +147,9 @@ try
             string.Equals(cfg["BootstrapAdmin:ResetPassword"], "true", StringComparison.OrdinalIgnoreCase),
             cfg["BootstrapAdmin:DefaultPassword"]);
         Log.Information("BootstrapAdmin: {Result}", result);
+
+        // Configuración inicial (SQLite) si está vacía: tablas/fuentes y relación de pruebas VTI.
+        await scope.ServiceProvider.GetRequiredService<SXA.RTX.Analytics.Infrastructure.Services.ConfigSeeder>().SeedAsync();
 
         Log.Information("DB ready Provider={Provider} Users={Count}", db.Database.ProviderName, await db.Set<AppUser>().CountAsync());
     }

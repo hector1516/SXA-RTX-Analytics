@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Data.Common;
 using Microsoft.Data.SqlClient;
 using System.Data.Odbc;
@@ -136,92 +136,15 @@ CREATE UNIQUE INDEX IX_SXA_RTX_Users_Username ON dbo.SXA_RTX_Users(Username);";
         _logger = logger;
     }
 
-    public async Task<IReadOnlyList<SystemTableStatus>> GetSystemTablesStatusAsync(CancellationToken ct = default)
-    {
-        // InMemory (scaffold sin SQL) → simula que todas existen (EnsureCreated las crea en memoria)
-        if (!_db.Database.IsRelational() || _db.Database.ProviderName?.Contains("InMemory", StringComparison.OrdinalIgnoreCase) == true)
-        {
-            return Definitions.Select(d => d with { Exists = true }).ToList();
-        }
+    public Task<IReadOnlyList<SystemTableStatus>> GetSystemTablesStatusAsync(CancellationToken ct = default)
+        // La base SQL es de solo lectura: la configuracion vive en SQLite. Nada que listar/crear aqui.
+        => Task.FromResult<IReadOnlyList<SystemTableStatus>>(Array.Empty<SystemTableStatus>());
 
-        var result = new List<SystemTableStatus>();
-        var conn = _db.Database.GetDbConnection();
-        var shouldClose = conn.State != ConnectionState.Open;
-        if (shouldClose) await conn.OpenAsync(ct);
-        try
-        {
-            foreach (var def in Definitions)
-            {
-                var exists = await TableExistsAsync(conn, def.Schema, def.TableName, ct);
-                result.Add(def with { Exists = exists });
-            }
-        }
-        finally
-        {
-            if (shouldClose) await conn.CloseAsync();
-        }
-        return result;
-    }
+    public Task<(bool Success, string Message)> CreateTableAsync(string tableName, CancellationToken ct = default)
+        => Task.FromResult((false, "La base SQL es de solo lectura: la aplicacion no crea ni modifica tablas."));
 
-    public async Task<(bool Success, string Message)> CreateTableAsync(string tableName, CancellationToken ct = default)
-    {
-        var def = Definitions.FirstOrDefault(d => string.Equals(d.TableName, tableName, StringComparison.OrdinalIgnoreCase));
-        if (def is null || string.IsNullOrEmpty(def.CreateSql))
-            return (false, $"Tabla del sistema no reconocida: {tableName}");
-        var sql = def.CreateSql;
-
-        if (!_db.Database.IsRelational() || _db.Database.ProviderName?.Contains("InMemory", StringComparison.OrdinalIgnoreCase) == true)
-        {
-            // En InMemory no hay SQL real — simulamos éxito y logueamos.
-            _logger.LogInformation("Simulado CREATE TABLE {Table} en InMemory (sin SQL Server)", tableName);
-            return (true, $"[Modo scaffold/InMemory] Se simuló la creación de {tableName}. Con SQL Server real se ejecutará: {sql[..Math.Min(80, sql.Length)]}...");
-        }
-
-        try
-        {
-            var conn = _db.Database.GetDbConnection();
-            var shouldClose = conn.State != ConnectionState.Open;
-            if (shouldClose) await conn.OpenAsync(ct);
-            try
-            {
-                // Verificar si ya existe
-                var schema = "dbo";
-                if (await TableExistsAsync(conn, schema, tableName, ct))
-                    return (true, $"{tableName} ya existe.");
-
-                using var cmd = conn.CreateCommand();
-                cmd.CommandText = sql;
-                cmd.CommandTimeout = 30;
-                await cmd.ExecuteNonQueryAsync(ct);
-                _logger.LogInformation("Tabla del sistema creada: {Table}", tableName);
-                return (true, $"{tableName} creada correctamente.");
-            }
-            finally
-            {
-                if (shouldClose) await conn.CloseAsync();
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creando tabla {Table}", tableName);
-            return (false, $"Error: {ex.Message}");
-        }
-    }
-
-    public async Task<(bool Success, string Message)> CreateAllMissingAsync(CancellationToken ct = default)
-    {
-        var statuses = await GetSystemTablesStatusAsync(ct);
-        var missing = statuses.Where(s => !s.Exists).ToList();
-        if (missing.Count == 0) return (true, "Todas las tablas del sistema ya existen.");
-        var msgs = new List<string>();
-        foreach (var t in missing)
-        {
-            var r = await CreateTableAsync(t.TableName, ct);
-            msgs.Add($"{t.TableName}: {r.Message}");
-            if (!r.Success) return (false, string.Join(" | ", msgs));
-        }
-        return (true, string.Join(" | ", msgs));
-    }
+    public Task<(bool Success, string Message)> CreateAllMissingAsync(CancellationToken ct = default)
+        => Task.FromResult((false, "La base SQL es de solo lectura: la aplicacion no crea ni modifica tablas."));
 
     public async Task<(bool Success, string Message)> TestSqlConnectionAsync(string connectionString, CancellationToken ct = default)
     {

@@ -36,7 +36,8 @@ public interface ITablasConfigService
 
 /// <summary>
 /// Configuración visual de una tabla operacional: Fuente (aplicación que la escribe),
-/// título amigable, columnas de serie/fecha para trazabilidad y columnas con nickname.
+/// título amigable, columnas de serie/fecha para trazabilidad, columnas con nickname
+/// y tabla de detalle relacionada (p. ej. las pruebas de un registro VTI).
 /// </summary>
 public sealed record TablaConfigDto(
     string TableName,
@@ -44,10 +45,25 @@ public sealed record TablaConfigDto(
     string? DisplayName,
     string? SerialColumn,
     string? DateColumn,
-    IReadOnlyList<TablaColumnaDto> Columnas);
+    IReadOnlyList<TablaColumnaDto> Columnas,
+    TablaDetalleDto? Detalle = null);
 
 /// <summary>Columna configurada: nombre real en SQL + nickname visible (null = nombre real).</summary>
 public sealed record TablaColumnaDto(string ColumnName, string? DisplayName);
+
+/// <summary>
+/// Relación 1:N con una tabla de detalle (p. ej. VTi_UutRecords -> VTi_UutRecordDetails).
+/// Sirve para mostrar los resultados de las pruebas en la trazabilidad.
+/// </summary>
+public sealed record TablaDetalleDto(
+    string? Table,
+    string? ForeignKey,
+    string? ParentKey,
+    string? DateColumn,
+    string? TitleColumn,
+    string? ResultColumn,
+    string? ValueColumn,
+    string? UnitsColumn);
 
 /// <summary>Evento de trazabilidad de una tabla para un número de serie.</summary>
 public sealed record TraceEventDto(
@@ -55,7 +71,8 @@ public sealed record TraceEventDto(
     string TableName,
     string TableDisplayName,
     DateTime? OccurredAt,
-    IReadOnlyDictionary<string, string?> Values);
+    IReadOnlyDictionary<string, string?> Values,
+    IReadOnlyList<IReadOnlyDictionary<string, string?>>? Details = null);
 
 /// <summary>Especificación de una tabla para la búsqueda de trazabilidad.</summary>
 public sealed record TraceTableSpec(
@@ -64,4 +81,5 @@ public sealed record TraceTableSpec(
     string TableDisplayName,
     string SerialColumn,
     string DateColumn,
-    IReadOnlyList<string> Columns);
+    IReadOnlyList<string> Columns,
+    TablaDetalleDto? Detalle = null);

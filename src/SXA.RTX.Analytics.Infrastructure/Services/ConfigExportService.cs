@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SXA.RTX.Analytics.Application.Abstractions;
@@ -45,6 +45,14 @@ public sealed class ConfigExportService : IConfigExportService
             t.DisplayName,
             t.SerialColumn,
             t.DateColumn,
+            t.DetailTable,
+            t.DetailForeignKey,
+            t.DetailParentKey,
+            t.DetailDateColumn,
+            t.DetailTitleColumn,
+            t.DetailResultColumn,
+            t.DetailValueColumn,
+            t.DetailUnitsColumn,
             Columnas = t.Columnas
                 .OrderBy(c => c.ColumnName)
                 .Select(c => new { c.ColumnName, c.DisplayName })
@@ -128,6 +136,14 @@ public sealed class ConfigExportService : IConfigExportService
                         DisplayName = el.TryGetProperty("DisplayName", out var dn) && dn.ValueKind == JsonValueKind.String ? dn.GetString() : null,
                         SerialColumn = el.TryGetProperty("SerialColumn", out var sc) && sc.ValueKind == JsonValueKind.String ? sc.GetString() : null,
                         DateColumn = el.TryGetProperty("DateColumn", out var dc) && dc.ValueKind == JsonValueKind.String ? dc.GetString() : null,
+                        DetailTable = el.TryGetProperty("DetailTable", out var dt) && dt.ValueKind == JsonValueKind.String ? dt.GetString() : null,
+                        DetailForeignKey = el.TryGetProperty("DetailForeignKey", out var dfk) && dfk.ValueKind == JsonValueKind.String ? dfk.GetString() : null,
+                        DetailParentKey = el.TryGetProperty("DetailParentKey", out var dpk) && dpk.ValueKind == JsonValueKind.String ? dpk.GetString() : null,
+                        DetailDateColumn = el.TryGetProperty("DetailDateColumn", out var ddc) && ddc.ValueKind == JsonValueKind.String ? ddc.GetString() : null,
+                        DetailTitleColumn = el.TryGetProperty("DetailTitleColumn", out var dtc) && dtc.ValueKind == JsonValueKind.String ? dtc.GetString() : null,
+                        DetailResultColumn = el.TryGetProperty("DetailResultColumn", out var drc) && drc.ValueKind == JsonValueKind.String ? drc.GetString() : null,
+                        DetailValueColumn = el.TryGetProperty("DetailValueColumn", out var dvc) && dvc.ValueKind == JsonValueKind.String ? dvc.GetString() : null,
+                        DetailUnitsColumn = el.TryGetProperty("DetailUnitsColumn", out var duc) && duc.ValueKind == JsonValueKind.String ? duc.GetString() : null,
                     };
                     if (el.TryGetProperty("Columnas", out var colEl) && colEl.ValueKind == JsonValueKind.Array)
                         foreach (var c in colEl.EnumerateArray())

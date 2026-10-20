@@ -17,10 +17,10 @@
 <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between mb-3">
     <div>
         <h2 class="mb-1" style="font-weight:800; letter-spacing:-.02em">Configuración</h2>
-        <div class="text-muted small">SQL Server • MAPICS (ODBC) • Sistema <code>SXA_RTX_*</code> • Equipos • Tablas VTI/VTech</div>
+        <div class="text-muted small">SQL Server (solo lectura) • MAPICS (ODBC) • Almacenamiento local • Equipos • Tablas y fuentes</div>
     </div>
     <div class="d-flex gap-2">
-        <span class="rtx-pill rtx-pill--sky">Solo sistema</span>
+        <span class="rtx-pill rtx-pill--sky">SQL solo lectura</span>
         <span class="rtx-pill rtx-pill--honey">DeviceId PC-...</span>
     </div>
 </div>
@@ -28,9 +28,9 @@
 <ul class="nav nav-pills mb-4 flex-wrap" role="tablist">
     <li class="nav-item"><button class="nav-link @(ActiveTab==0?"active":"")" @onclick="() => ActiveTab=0">SQL Server</button></li>
     <li class="nav-item"><button class="nav-link @(ActiveTab==1?"active":"")" @onclick="() => ActiveTab=1">MAPICS (ODBC)</button></li>
-    <li class="nav-item"><button class="nav-link @(ActiveTab==2?"active":"")" @onclick="() => ActiveTab=2">Tablas sistema</button></li>
+    <li class="nav-item"><button class="nav-link @(ActiveTab==2?"active":"")" @onclick="() => ActiveTab=2">Almacenamiento</button></li>
     <li class="nav-item"><button class="nav-link @(ActiveTab==3?"active":"")" @onclick="async () => { ActiveTab=3; await LoadEquipos(); }">Equipos</button></li>
-    <li class="nav-item"><button class="nav-link @(ActiveTab==4?"active":"")" @onclick="async () => { ActiveTab=4; await LoadTablas(); }">Tablas VTI/VTech</button></li>
+    <li class="nav-item"><button class="nav-link @(ActiveTab==4?"active":"")" @onclick="async () => { ActiveTab=4; await LoadTablas(); }">Tablas y fuentes</button></li>
     <li class="nav-item"><button class="nav-link @(ActiveTab==5?"active":"")" @onclick="() => ActiveTab=5">Import/Export</button></li>
 </ul>
 
@@ -77,13 +77,13 @@ else if (ActiveTab == 2)
 {
     <div class="card">
         <div class="card-body">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                <div><h5 class="card-title mb-1">Tablas del sistema <code>SXA_RTX_*</code></h5><div class="text-muted small">Solo estas se crean desde aquí.</div></div>
-                <button class="btn btn-primary btn-sm" @onclick="CreateAll" disabled="@IsCreatingAll">Crear faltantes</button>
-            </div>
-            @if (IsLoadingTables) { <div class="text-center py-4"><div class="spinner-border"></div></div> }
-            else { <div class="table-responsive mt-3"><table class="table table-hover align-middle small"><thead><tr><th>Tabla</th><th>Propósito</th><th>Estado</th><th></th></tr></thead><tbody>@foreach (var t in Tables) { <tr><td class="font-monospace"><span class="rtx-pill">@t.TableName</span></td><td class="text-muted">@t.Purpose</td><td>@if (t.Exists) { <span class="badge bg-success">Existe</span> } else { <span class="badge bg-warning text-dark">Falta</span> }</td><td>@if (!t.Exists) { <button class="btn btn-sm btn-outline-primary" @onclick="() => CreateOne(t.TableName)" disabled="@Creating.Contains(t.TableName)">@(Creating.Contains(t.TableName) ? "Creando..." : "Crear")</button> } else { <span class="text-muted small">OK</span> }</td></tr> }</tbody></table></div> }
-            @if (!string.IsNullOrEmpty(TableMsg)) { <div class="alert @(TableOk ? "alert-success" : "alert-danger") mt-3 py-2 small">@TableMsg</div> }
+            <h5 class="card-title">Almacenamiento de configuración</h5>
+            <p class="text-muted small">La base SQL de producción es <strong>solo lectura</strong>: la aplicación nunca crea, altera ni escribe tablas en ella.</p>
+            <ul class="text-muted small mb-0">
+                <li>Usuarios, fuentes, títulos, nicknames, relaciones y ajustes se guardan en un archivo <strong>SQLite local</strong>: <code>data/sxa-config.db</code> (junto a la aplicación).</li>
+                <li>Las conexiones SQL/ODBC se guardan cifradas con DPAPI en ese mismo archivo.</li>
+                <li>Para respaldar o mover la configuración entre equipos usa <strong>Import/Export</strong>.</li>
+            </ul>
         </div>
     </div>
 }
@@ -260,9 +260,6 @@ else if (ActiveTab == 5)
     // ODBC
     string OdbcConnectionString = "DSN=MAPICS;"; bool IsTestingOdbc = false; bool OdbcTestOk = false; string? OdbcTestMsg;
 
-    // System tables
-    List<SystemTableStatus> Tables = new(); bool IsLoadingTables = false; bool IsCreatingAll = false; HashSet<string> Creating = new(); string? TableMsg; bool TableOk = false;
-
     // Equipos
     List<CatalogDeviceDto> Catalog = new(); List<EquipoDto> Equipos = new(); bool IsLoadingEquipos = false;
     string EqDeviceId = ""; string EqNombre = ""; string EqArea = ""; bool IsSavingEquipo = false; string? EqMsg; bool EqOk = false;
@@ -289,7 +286,7 @@ else if (ActiveTab == 5)
     // Import/Export
     bool IsExporting = false; bool IsImporting = false; string? ImportExportMsg; bool ImportExportOk = false; string? ExportPreview;
 
-    protected override async Task OnInitializedAsync() { await LoadConnections(); await LoadTables(); await LoadEquipos(); }
+    protected override async Task OnInitializedAsync() { await LoadConnections(); await LoadEquipos(); }
 
     // Contraseña leída de la conexión configurada. No se muestra en el formulario,
     // pero se usa para construir la cadena mientras el admin no escriba otra.
@@ -353,10 +350,7 @@ else if (ActiveTab == 5)
     async Task TestSql(){ IsTestingSql=true; SqlTestMsg=null; var (ok,msg)=await SystemService.TestSqlConnectionAsync(BuildSqlConnectionStringReal()); SqlTestOk=ok; SqlTestMsg=msg; IsTestingSql=false; }
     async Task LoadDatabases(){ var list=await SystemService.ListDatabasesAsync(BuildSqlConnectionStringReal()); Databases=list.Select(n=>new DatabaseOptionMutable{Name=n}).ToList(); }
     async Task TestOdbc(){ IsTestingOdbc=true; OdbcTestMsg=null; var (ok,msg)=await SystemService.TestOdbcConnectionAsync(OdbcConnectionString); OdbcTestOk=ok; OdbcTestMsg=msg; IsTestingOdbc=false; }
-    async Task LoadTables(){ IsLoadingTables=true; try { Tables=(await SystemService.GetSystemTablesStatusAsync()).ToList(); } finally { IsLoadingTables=false; } }
-    async Task CreateOne(string t){ Creating.Add(t); var (ok,msg)=await SystemService.CreateTableAsync(t); TableOk=ok; TableMsg=msg; Creating.Remove(t); await LoadTables(); }
-    async Task CreateAll(){ IsCreatingAll=true; var (ok,msg)=await SystemService.CreateAllMissingAsync(); TableOk=ok; TableMsg=msg; IsCreatingAll=false; await LoadTables(); }
-
+    
     async Task LoadEquipos(){
         IsLoadingEquipos=true;
         try
@@ -464,7 +458,7 @@ else if (ActiveTab == 5)
             var json = await reader.ReadToEndAsync();
             var (ok,msg)=await ExportService.ImportJsonAsync(json);
             ImportExportOk=ok; ImportExportMsg=msg;
-            if(ok){ await LoadEquipos(); await LoadTablas(); await LoadTables(); }
+            if(ok){ await LoadEquipos(); await LoadTablas(); }
         } catch(Exception ex){ ImportExportOk=false; ImportExportMsg=ex.Message; }
         IsImporting=false;
     }

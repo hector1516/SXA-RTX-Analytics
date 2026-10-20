@@ -32,6 +32,19 @@ public sealed class TablaConfig : BaseEntity
     /// <summary>Columna de fecha principal de la tabla. null = autodetectar.</summary>
     public string? DateColumn { get; set; }
 
+    /// <summary>
+    /// Tabla de detalle relacionada (1:N), p. ej. VTi_UutRecords -> VTi_UutRecordDetails.
+    /// Se usa para mostrar los resultados de las pruebas en la trazabilidad.
+    /// </summary>
+    public string? DetailTable { get; set; }
+    public string? DetailForeignKey { get; set; }   // columna del detalle que apunta al padre
+    public string? DetailParentKey { get; set; }    // columna del padre (por defecto Id/ID)
+    public string? DetailDateColumn { get; set; }
+    public string? DetailTitleColumn { get; set; }  // p. ej. Test
+    public string? DetailResultColumn { get; set; } // p. ej. Result
+    public string? DetailValueColumn { get; set; }  // p. ej. Value
+    public string? DetailUnitsColumn { get; set; }  // p. ej. Units
+
     public ICollection<TablaColumna> Columnas { get; set; } = new List<TablaColumna>();
 }
 
