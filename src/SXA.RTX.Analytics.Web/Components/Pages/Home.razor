@@ -8,6 +8,8 @@
 @inject ISystemTableService SystemService
 @inject IConfiguration Config
 @inject IJSRuntime JS
+@inject IDashboardService Dashboard
+@inject IDataSourceService DataSources
 
 <PageTitle>Panel — SXA-RTX Analytics</PageTitle>
 
@@ -93,6 +95,85 @@
     </div>
 </div>
 
+<div class="row g-3 mb-3">
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Actividad reciente</span>
+                <span class="text-muted small">registros por día · últimos 14 días</span>
+            </div>
+            <div class="card-body">
+                @if (Snap is null || Snap.Activity.All(a => a.Count == 0))
+                {
+                    <div class="text-center text-muted py-5">
+                        <Icon Name="activity" Size="28" />
+                        <div class="mt-2 small">Sin actividad reciente en las tablas configuradas.</div>
+                    </div>
+                }
+                else
+                {
+                    <div class="rx-chart rx-chart--md"><canvas id="homeActivity"></canvas></div>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Última actividad</span>
+                <span class="text-muted small">por tabla</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Tabla</th><th class="text-end">7 días</th><th>Último</th></tr></thead>
+                    <tbody>
+                        @foreach (var t in UltimaActividad)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold">@t.DisplayName</div>
+                                    <div class="text-muted small" style="font-size:.72rem">@t.Fuente</div>
+                                </td>
+                                <td class="text-end">@t.RecentCount</td>
+                                <td class="text-muted">@(t.LastDate?.ToString("MM-dd HH:mm") ?? "—")</td>
+                            </tr>
+                        }
+                        @if (!UltimaActividad.Any()) { <tr><td colspan="3" class="text-center text-muted py-3">Sin datos</td></tr> }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-12">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Registros más recientes</span>
+                <a href="/trace" class="small text-decoration-none">Ir a trazabilidad →</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead><tr><th>Serie</th><th>Tabla</th><th>Fuente</th><th>Fecha</th></tr></thead>
+                    <tbody>
+                        @foreach (var r in RegistrosRecientes)
+                        {
+                            <tr>
+                                <td class="font-monospace" style="font-size:.8rem">@r.Serial</td>
+                                <td>@r.DisplayName</td>
+                                <td>@if (!string.IsNullOrWhiteSpace(r.Fuente)) { <span class="rx-chip">@r.Fuente</span> }</td>
+                                <td class="text-muted">@(r.Date?.ToString("yyyy-MM-dd HH:mm:ss") ?? "—")</td>
+                            </tr>
+                        }
+                        @if (!RegistrosRecientes.Any()) { <tr><td colspan="4" class="text-center text-muted py-3">Sin registros recientes</td></tr> }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="row g-3">
     <div class="col-lg-8">
         <div class="card h-100">
@@ -140,7 +221,11 @@
     List<EquipoDto> UltimosEquipos = new();
     List<(string Nombre, int Count)> Areas = new();
     int EquiposCount, TablasCount;
-    bool _chartsDrawn;
+    DashboardSnapshotDto? Snap;
+    bool _areasDrawn, _activityDrawn;
+
+    IReadOnlyList<TableActivityDto> UltimaActividad => Snap?.Tables.Take(10).ToList() ?? new List<TableActivityDto>();
+    IReadOnlyList<RecentRecordDto> RegistrosRecientes => Snap?.Recent ?? new List<RecentRecordDto>();
 
     protected override async Task OnInitializedAsync()
     {
@@ -180,15 +265,34 @@
         _ = CheckConnections();
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    async Task LoadDashboardAsync()
     {
-        if (!firstRender || _chartsDrawn) return;
-        _chartsDrawn = true;
         try
         {
-            if (Areas.Count > 0)
+            var ds = await DataSources.GetAsync();
+            var cfg = (await TablasService.GetConfigAsync()).ToList();
+            Snap = await Dashboard.GetSnapshotAsync(ds.EffectiveOperationalConnectionString, cfg);
+            StateHasChanged();
+        }
+        catch { }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) _ = LoadDashboardAsync();
+
+        try
+        {
+            if (Areas.Count > 0 && !_areasDrawn)
+            {
+                _areasDrawn = true;
                 await JS.InvokeVoidAsync("renderBars", "homeAreas", Areas.Select(a => a.Nombre).ToArray(), Areas.Select(a => a.Count).ToArray(), "Equipos");
-            await JS.InvokeVoidAsync("renderDonut", "homeTipo", new[] { "VTI", "VTech" }, new[] { VtiTotal, VtechTotal });
+            }
+            if (Snap is not null && Snap.Activity.Any(a => a.Count > 0) && !_activityDrawn)
+            {
+                _activityDrawn = true;
+                await JS.InvokeVoidAsync("renderChart", "homeActivity", "area", Snap.Activity.Select(a => a.Day).ToArray(), Snap.Activity.Select(a => a.Count).ToArray(), "Registros");
+            }
         }
         catch { }
     }

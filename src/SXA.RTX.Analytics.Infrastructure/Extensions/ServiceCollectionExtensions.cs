@@ -37,6 +37,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITraceService, TraceService>();
         services.AddScoped<ITraceReportService, TraceReportService>();
         services.AddScoped<IRelationReportService, RelationReportService>();
+        services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IExportService, ExportService>();
         return services;
     }
