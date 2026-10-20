@@ -1,4 +1,4 @@
-; SXA-RTX Analytics - Instalador dual IIS / Windows Service
+﻿; SXA-RTX Analytics - Instalador dual IIS / Windows Service
 ; Uso: iscc /DMyAppVersion=1.0.0 installer\Analytics.iss  (o via publish-analytics.ps1)
 ;
 ; IMPORTANTE: las rutas relativas de este archivo se resuelven desde la carpeta
@@ -63,3 +63,21 @@ Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\i
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\logs"
+
+[Code]
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  Msg: String;
+begin
+  if (CurStep = ssPostInstall) and (not WizardSilent) then
+  begin
+    Msg := 'SXA-RTX Analytics se instaló correctamente.' + #13#10#13#10 +
+           'Abre: http://localhost:5000' + #13#10 +
+           'Usuario inicial: ECCSA' + #13#10 +
+           'Contraseña inicial: Qwe123456' + #13#10#13#10 +
+           'La conexión SQL quedó precargada por defecto.' + #13#10 +
+           'Guarda estos datos y cambia la contraseña al entrar.' + #13#10 +
+           'También quedó una copia en PRIMER-INGRESO.txt.';
+    MsgBox(Msg, mbInformation, MB_OK);
+  end;
+end;

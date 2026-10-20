@@ -27,8 +27,10 @@
    - Abre el puerto en el firewall.
    - Inicializa la configuración (`--ensure-db`) y registra la tarea de actualización (cada hora).
    - Verifica `/health/live` y avisa si no responde `Healthy`.
-3. Entrar a `http://servidor:5000` con `ECCSA` / `Qwe123456` y cambiarla.
-4. Configurar la conexión SQL (solo lectura) en **Configuración → SQL Server**.
+3. Entrar a `http://servidor:5000` con `ECCSA` / `Qwe123456` y cambiarla (el instalador muestra
+   estas credenciales al terminar y las deja en `PRIMER-INGRESO.txt`).
+4. La conexión SQL queda **precargada** desde `appsettings.json` (se copia a 
+   `appsettings.Production.json`). Puedes verla/cambiarla en **Configuración → SQL Server**.
 
 Opciones del script (`installer\install.ps1`):
 

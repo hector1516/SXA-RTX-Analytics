@@ -192,6 +192,51 @@ function Invoke-EnsureDb {
   }
 }
 
+function Set-DefaultSqlConnection {
+  $prod = Join-Path $InstallPath "appsettings.Production.json"
+  if (Test-Path $prod) { Write-Step "appsettings.Production.json ya existe; se respeta."; return }
+  $base = Join-Path $InstallPath "appsettings.json"
+  if (-not (Test-Path $base)) { Write-Step "No se encontró appsettings.json; se omite la conexión por defecto."; return }
+  try {
+    $raw = Get-Content -LiteralPath $base -Raw
+    $m = [regex]::Match($raw, '"ConfigurationDatabase"\s*:\s*"([^"]*)"')
+    $cs = if ($m.Success) { $m.Groups[1].Value } else { $null }
+  } catch { $cs = $null }
+  if ([string]::IsNullOrWhiteSpace($cs)) { Write-Step "appsettings.json no define ConnectionStrings:ConfigurationDatabase."; return }
+  $json = [ordered]@{ ConnectionStrings = [ordered]@{ ConfigurationDatabase = $cs } } | ConvertTo-Json -Depth 4
+  Invoke-Step "Dejando la conexión SQL por defecto (desde appsettings.json)" {
+    Set-Content -LiteralPath $prod -Value $json -Encoding UTF8
+  }
+}
+
+function Write-FirstLoginNote {
+  $base = Join-Path $InstallPath "appsettings.json"
+  $user = "ECCSA"; $pass = "Qwe123456"
+  try {
+    $raw = Get-Content -LiteralPath $base -Raw
+    $mu = [regex]::Match($raw, '"Username"\s*:\s*"([^"]*)"')
+    $mp = [regex]::Match($raw, '"DefaultPassword"\s*:\s*"([^"]*)"')
+    if ($mu.Success -and $mu.Groups[1].Value) { $user = $mu.Groups[1].Value }
+    if ($mp.Success -and $mp.Groups[1].Value) { $pass = $mp.Groups[1].Value }
+  } catch { }
+  $file = Join-Path $InstallPath "PRIMER-INGRESO.txt"
+  $content = @"
+SXA-RTX Analytics - Primer ingreso
+==================================
+URL:      http://localhost:$Port
+Usuario:  $user
+Password: $pass
+
+Importante:
+- Cambia la contraseña en el primer ingreso.
+- Crea los usuarios adicionales en "Usuarios" (solo Administrador).
+- Borra este archivo después de cambiar la contraseña.
+"@
+  Invoke-Step "Creando PRIMER-INGRESO.txt con las credenciales iniciales" {
+    Set-Content -LiteralPath $file -Value $content -Encoding UTF8
+  }
+}
+
 function Register-Updater([string]$runtimeMode) {
   $updater = Join-Path $InstallPath "tools\update-analytics.ps1"
   if (-not (Test-Path $updater)) { Write-Step "No se encontró tools\update-analytics.ps1; se omite la tarea programada."; return }
@@ -246,6 +291,7 @@ try {
   Write-Step ("Modo de ejecución detectado: " + $(if ($isIis) { "IIS" } else { "Windows Service" }))
 
   Ensure-Directories
+  Set-DefaultSqlConnection
 
   if (-not $SkipPrereqs) {
     if ($isIis) { Ensure-IISFeatures }
@@ -257,6 +303,7 @@ try {
   if ($isIis) { Install-IIS } else { Install-Service }
 
   Invoke-EnsureDb
+  Write-FirstLoginNote
   Register-Updater $(if ($isIis) { "IIS" } else { "Service" })
 
   if ($script:NeedIisReset -and -not $DryRun) {
