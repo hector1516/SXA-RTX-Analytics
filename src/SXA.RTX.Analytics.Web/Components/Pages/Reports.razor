@@ -1,0 +1,201 @@
+@page "/reports"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using SXA.RTX.Analytics.Application.Abstractions
+@inject IRelationReportService RelationService
+@inject IDataSourceService DataSources
+@inject IJSRuntime JS
+
+<PageTitle>Reportes - SXA-RTX Analytics</PageTitle>
+
+<div class="rx-page-head">
+    <div>
+        <div class="rx-eyebrow">Reportes</div>
+        <h1>Relaciones entre tablas</h1>
+        <div class="text-muted small">Relaciones descubiertas automáticamente en la base de datos (solo lectura).</div>
+    </div>
+    <button class="btn btn-outline-primary" @onclick="Load" disabled="@IsLoading">
+        @if (IsLoading) { <span class="spinner-border spinner-border-sm"></span> } else { <Icon Name="refresh" Size="16" /> }
+        Actualizar
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(Msg)) { <div class="alert alert-danger py-2 small">@Msg</div> }
+
+@if (IsLoading)
+{
+    <div class="text-center py-5"><div class="spinner-border"></div></div>
+}
+else if (Relations.Count == 0)
+{
+    <div class="card"><div class="card-body text-center text-muted py-5">
+        <Icon Name="database" Size="28" />
+        <div class="mt-2">No se encontraron relaciones. Verifica la conexión SQL en Configuración.</div>
+    </div></div>
+}
+else
+{
+    @foreach (var cat in Categories)
+    {
+        <div class="mb-4">
+            <h6 class="text-uppercase small fw-bold text-muted mb-2">@cat.Key</h6>
+            <div class="row g-3">
+                @foreach (var rel in cat)
+                {
+                    <div class="col-md-6 col-xl-4">
+                        <div class="card h-100">
+                            <div class="card-body d-flex flex-column">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <h6 class="card-title mb-1">@rel.Title</h6>
+                                    <span class="rtx-pill rtx-pill--sky">@rel.Category</span>
+                                </div>
+                                <div class="small text-muted font-monospace mb-3" style="font-size:.72rem">@rel.ParentTable · @rel.ParentKeyColumn → @rel.ChildTable · @rel.ChildKeyColumn</div>
+                                <div class="mt-auto">
+                                    <button class="btn btn-sm btn-primary" @onclick="() => Select(rel)">Ejecutar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @if (SelectedRelation is not null)
+    {
+        <div class="card mb-3">
+            <div class="card-header d-flex flex-wrap gap-2 justify-content-between align-items-center">
+                <span>@SelectedRelation.Title <span class="text-muted small font-monospace">· @SelectedRelation.ParentTable → @SelectedRelation.ChildTable</span></span>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="ClosePanel">Cerrar</button>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label small fw-bold">@KeyLabel</label>
+                        <input class="form-control font-monospace" @bind="Key" @bind:event="oninput" placeholder="@KeyPlaceholder" @onkeydown="OnKey" />
+                        <div class="form-text">Filtra @SelectedRelation.ParentTable por @SelectedRelation.ParentSearchColumn.</div>
+                    </div>
+                    <div class="col-md-7 d-flex flex-wrap gap-2 align-items-end">
+                        <button class="btn btn-primary" @onclick="Run" disabled="@IsRunning" style="min-width:130px">@if (IsRunning) { <span class="spinner-border spinner-border-sm"></span> } else { <Icon Name="search" Size="16" /> } Ejecutar reporte</button>
+                        <button class="btn btn-outline-primary" @onclick="ExportCsv" disabled="@(Result is null || IsExporting)" style="min-width:100px"><Icon Name="list" Size="16" /> CSV</button>
+                        <button class="btn btn-outline-primary" @onclick="ExportPdf" disabled="@(Result is null || IsExporting)" style="min-width:100px"><Icon Name="file-pdf" Size="16" /> PDF</button>
+                    </div>
+                </div>
+
+                @if (Result is not null)
+                {
+                    var parentRows = Result.ParentRows.Take(300).ToList();
+                    var childRows = Result.ChildRows.Take(500).ToList();
+                    <div class="mt-4">
+                        <h6 class="mb-1">@SelectedRelation.ParentTable <span class="text-muted small">· @Result.ParentTotal fila(s)</span></h6>
+                        <div class="table-responsive" style="max-height:340px;overflow:auto">
+                            <table class="table table-sm small align-middle mb-0">
+                                <thead class="table-light"><tr>@foreach (var c in Result.ParentColumns) { <th>@c</th> }</tr></thead>
+                                <tbody>
+                                    @foreach (var row in parentRows)
+                                    {
+                                        <tr>@foreach (var cell in row) { <td>@Trunc(cell, 120)</td> }</tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        @if (Result.ParentTotal > parentRows.Count) { <div class="text-muted small mt-1">Mostrando @parentRows.Count de @Result.ParentTotal.</div> }
+
+                        <h6 class="mb-1 mt-4">@SelectedRelation.ChildTable <span class="text-muted small">· @Result.ChildTotal fila(s)</span></h6>
+                        <div class="table-responsive" style="max-height:420px;overflow:auto">
+                            <table class="table table-sm small align-middle mb-0">
+                                <thead class="table-light"><tr>@foreach (var c in Result.ChildColumns) { <th>@c</th> }</tr></thead>
+                                <tbody>
+                                    @foreach (var row in childRows)
+                                    {
+                                        <tr>@foreach (var cell in row) { <td>@Trunc(cell, 120)</td> }</tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        @if (Result.ChildTotal > childRows.Count) { <div class="text-muted small mt-1">Mostrando @childRows.Count de @Result.ChildTotal.</div> }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    string ConnStr = "";
+    List<TableRelationDto> Relations = new();
+    bool IsLoading;
+    string? Msg;
+    TableRelationDto? SelectedRelation;
+    string Key = "";
+    RelationResultDto? Result;
+    bool IsRunning, IsExporting;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    async Task Load()
+    {
+        IsLoading = true; Msg = null;
+        try
+        {
+            var ds = await DataSources.GetAsync();
+            ConnStr = ds.EffectiveOperationalConnectionString ?? "";
+            Relations = (await RelationService.DiscoverAsync(ConnStr)).ToList();
+        }
+        catch (Exception ex) { Msg = ex.Message; }
+        finally { IsLoading = false; }
+    }
+
+    IReadOnlyList<IGrouping<string, TableRelationDto>> Categories =>
+        Relations.GroupBy(r => r.Category, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase).ToList();
+
+    void Select(TableRelationDto rel) { SelectedRelation = rel; Key = ""; Result = null; }
+    void ClosePanel() { SelectedRelation = null; Result = null; Key = ""; }
+
+    bool IsSerialColumn(string c) =>
+        c.IndexOf("serial", StringComparison.OrdinalIgnoreCase) >= 0
+        || c.IndexOf("serie", StringComparison.OrdinalIgnoreCase) >= 0;
+
+    string KeyLabel => SelectedRelation is null ? "" : IsSerialColumn(SelectedRelation.ParentSearchColumn) ? "Número de serie" : SelectedRelation.ParentSearchColumn;
+    string KeyPlaceholder => SelectedRelation is null ? "" : IsSerialColumn(SelectedRelation.ParentSearchColumn) ? "Ej. MY26K080332" : $"Valor de {SelectedRelation.ParentSearchColumn}";
+
+    async Task OnKey(KeyboardEventArgs e) { if (e.Key == "Enter") await Run(); }
+
+    async Task Run()
+    {
+        if (SelectedRelation is null || string.IsNullOrWhiteSpace(Key)) { Msg = "Escribe un valor para buscar."; return; }
+        IsRunning = true; Result = null; Msg = null;
+        try { Result = await RelationService.RunAsync(ConnStr, SelectedRelation, Key.Trim()); }
+        catch (Exception ex) { Msg = "Error: " + ex.Message; }
+        finally { IsRunning = false; }
+    }
+
+    async Task ExportCsv()
+    {
+        if (SelectedRelation is null || Result is null) return;
+        IsExporting = true;
+        try { await Download(await RelationService.ExportCsvAsync(SelectedRelation, Result, Key.Trim()), "csv", "text/csv"); }
+        catch (Exception ex) { Msg = "Error: " + ex.Message; }
+        finally { IsExporting = false; }
+    }
+
+    async Task ExportPdf()
+    {
+        if (SelectedRelation is null || Result is null) return;
+        IsExporting = true;
+        try { await Download(await RelationService.ExportPdfAsync(SelectedRelation, Result, Key.Trim()), "pdf", "application/pdf"); }
+        catch (Exception ex) { Msg = "Error: " + ex.Message; }
+        finally { IsExporting = false; }
+    }
+
+    async Task Download(byte[] bytes, string ext, string mime)
+    {
+        var b64 = Convert.ToBase64String(bytes);
+        var name = $"reporte_{DateTime.Now:yyyyMMdd_HHmmss}.{ext}";
+        await JS.InvokeVoidAsync("eval", $"var a=document.createElement('a');a.href='data:{mime};base64,{b64}';a.download='{name}';document.body.appendChild(a);a.click();a.remove();");
+    }
+
+    static string Trunc(string? s, int max) =>
+        string.IsNullOrEmpty(s) ? "" : (s.Length <= max ? s : s.Substring(0, max) + "…");
+}

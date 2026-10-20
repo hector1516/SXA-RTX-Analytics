@@ -6,6 +6,10 @@
 @inject ITablasConfigService TablasService
 @inject IDataSourceService DataSources
 @inject IConfigurationService Settings
+@inject ITraceReportService ReportService
+@inject IJSRuntime JS
+@inject IWebHostEnvironment Env
+@using Microsoft.AspNetCore.Hosting
 
 <PageTitle>Trazabilidad — SXA-RTX Analytics</PageTitle>
 
@@ -15,6 +19,10 @@
         <h1>Línea de tiempo por número de serie</h1>
         <div class="text-muted small">Historial del producto a través de todas las fuentes configuradas.</div>
     </div>
+    <button class="btn btn-outline-primary" @onclick="GenerarReporte" disabled="@(Events.Count == 0 || IsGenerating)">
+        @if (IsGenerating) { <span class="spinner-border spinner-border-sm"></span> } else { <Icon Name="file-pdf" Size="16" /> }
+        Generar reporte
+    </button>
 </div>
 
 <div class="card mb-3">
@@ -64,14 +72,8 @@
     {
         <div class="card mb-3">
             <div class="card-header d-flex flex-wrap gap-2 justify-content-between align-items-center">
-                <span>Línea de tiempo <span class="text-muted small">· @Serial</span></span>
-                <div class="d-flex gap-2 align-items-center">
-                    <button class="btn btn-sm btn-outline-secondary rx-btn-icon" @onclick="ZoomOut" title="Alejar" aria-label="Alejar">−</button>
-                    <input type="range" min="1" max="40" step="0.5" @bind="Zoom" @bind:event="oninput" style="width:130px;margin:0" title="Zoom" />
-                    <button class="btn btn-sm btn-outline-secondary rx-btn-icon" @onclick="ZoomIn" title="Acercar" aria-label="Acercar">+</button>
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="Fit" title="Ajustar">Ajustar</button>
-                    <span class="small text-muted" style="min-width:44px;text-align:right">@Zoom.ToString("0.0")x</span>
-                </div>
+                <span>Línea de tiempo <span class="text-muted small">· @SearchedSerial</span></span>
+                <span class="text-muted small">@Events.Count eventos · escala automática</span>
             </div>
             <div class="card-body">
                 <div class="tl-window">
@@ -81,15 +83,21 @@
                         </div>
                         @foreach (var lane in Lanes)
                         {
+                            var dots = Layout.TryGetValue(lane.Key, out var placed) ? placed : lane.Value.Select(e => new DotPos(e, new List<TraceEventDto> { e }, Pct(e), 0, 1)).ToList();
+                            var rows = dots.Count == 0 ? 1 : dots.Max(d => d.Row) + 1;
+                            var trackH = 46 + (rows - 1) * 18;
                             <div class="tl-lane">
                                 <div class="tl-label" title="@lane.Key">@lane.Key <span class="tl-count">@lane.Value.Count</span></div>
-                                <div class="tl-track">
-                                    @foreach (var ev in lane.Value)
+                                <div class="tl-track" style="height:@(trackH)px">
+                                    @foreach (var dot in dots)
                                     {
-                                        <button class="tl-dot @(Selected == ev ? "is-selected" : "")"
-                                                style="left:@Pct(ev).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)%"
-                                                @onclick="() => Selected = ev"
-                                                title="@(ev.OccurredAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "sin fecha") — @ev.TableDisplayName"></button>
+                                        var ev = dot.Event;
+                                        var center = trackH / 2.0 + (dot.Row - (rows - 1) / 2.0) * 18;
+                                        var cluster = dot.Count > 1;
+                                        <button class="tl-dot @(cluster ? "tl-dot--cluster" : "") @(Selected is not null && dot.Events.Contains(Selected) ? "is-selected" : "")"
+                                                style="left:@dot.Left.ToString("F3", System.Globalization.CultureInfo.InvariantCulture)%;top:@center.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)px"
+                                                @onclick="() => Pick(dot)"
+                                                title="@(cluster ? $"{dot.Count} eventos · {ev.OccurredAt:yyyy-MM-dd HH:mm:ss} · clic para recorrerlos" : $"{ev.OccurredAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "sin fecha"} - {ev.TableDisplayName}")">@(cluster ? dot.Count.ToString() : "")</button>
                                     }
                                 </div>
                             </div>
@@ -171,12 +179,12 @@
 <style>
     .tl-window { overflow-x: auto; padding: .25rem 0 .5rem; }
     .tl { display: flex; flex-direction: column; gap: .35rem; padding-right: 46px; }
-    .tl-axis { position: relative; height: 1.25rem; margin-left: 148px; font-size: .7rem; color: var(--rx-muted); }
+    .tl-axis { position: relative; height: 1.25rem; margin-left: 148px; margin-right: 8px; font-size: .7rem; color: var(--rx-muted); }
     .tl-tick { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; font-variant-numeric: tabular-nums; }
     .tl-lane { display: flex; align-items: center; }
     .tl-label { flex: 0 0 140px; width: 140px; text-align: right; padding-right: 8px; font-size: .8rem; font-weight: 600; color: var(--rx-text-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .tl-count { display: inline-block; margin-left: 4px; padding: 0 .35rem; border-radius: 999px; background: var(--rx-surface-2); color: var(--rx-muted); font-size: .65rem; }
-    .tl-track { position: relative; flex: 1; height: 46px; border-top: 1px solid var(--rx-border); }
+    .tl-track { position: relative; flex: 1; height: 46px; margin: 0 8px; border-top: 1px solid var(--rx-border); }
     .tl-track::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--rx-border); }
     .tl-dot {
         position: absolute; top: 50%; transform: translate(-50%, -50%);
@@ -186,6 +194,7 @@
     }
     .tl-dot:hover { transform: translate(-50%, -50%) scale(1.35); }
     .tl-dot.is-selected { box-shadow: 0 0 0 4px var(--rx-accent-soft); transform: translate(-50%, -50%) scale(1.25); }
+    .tl-dot--cluster { width: auto; min-width: 24px; height: 22px; padding: 0 6px; border-radius: 999px; font-size: 9px; font-weight: 700; color: #fff; display: inline-flex; align-items: center; justify-content: center; }
     .rx-detail { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .5rem 1.25rem; margin: 0; }
     .rx-detail dt { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--rx-muted); font-weight: 600; }
     .rx-detail dd { margin: 0 0 .35rem; font-size: .85rem; word-break: break-word; }
@@ -193,7 +202,8 @@
 
 @code {
     string Serial = "";
-    bool IsSearching, Searched;
+    string SearchedSerial = "";
+    bool IsSearching, Searched, IsGenerating;
     string? Msg;
 
     string ConnStr = "";
@@ -229,7 +239,7 @@
 
     async Task Buscar()
     {
-        Msg = null; Selected = null; Events = new(); Lanes = new(); Searched = false;
+        Msg = null; Selected = null; Events = new(); Lanes = new(); Layout = new(StringComparer.OrdinalIgnoreCase); Searched = false;
         if (string.IsNullOrWhiteSpace(Serial)) { Msg = "Escribe un número de serie."; return; }
         if (Specs.Count == 0) { Msg = "No hay tablas con columna serie y fecha configuradas. Ve a Configuración → Tablas y fuentes."; return; }
 
@@ -240,10 +250,43 @@
             Lanes = Events.GroupBy(e => string.IsNullOrWhiteSpace(e.Fuente) ? "Sin fuente" : e.Fuente, StringComparer.OrdinalIgnoreCase)
                 .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+            Layout = BuildLayout();
+            SearchedSerial = Serial.Trim();
             Searched = true;
         }
         catch (Exception ex) { Msg = "Error: " + ex.Message; }
         finally { IsSearching = false; }
+    }
+
+    async Task GenerarReporte()
+    {
+        if (Events.Count == 0) return;
+        var serial = string.IsNullOrWhiteSpace(SearchedSerial) ? Serial.Trim() : SearchedSerial;
+        IsGenerating = true;
+        try
+        {
+            var assets = new TraceReportAssets(
+                await ReadAssetAsync("img/logo.png"),
+                await ReadAssetAsync("img/hussmann.png"));
+
+            var bytes = await ReportService.GeneratePdfAsync(serial, Events, Configs, assets);
+
+            var b64 = Convert.ToBase64String(bytes);
+            var safe = new string(serial.Where(char.IsLetterOrDigit).ToArray());
+            var name = $"Trazabilidad_{safe}_{DateTime.Now:yyyyMMdd_HHmm}.pdf";
+            await JS.InvokeVoidAsync("eval", $"var a=document.createElement('a');a.href='data:application/pdf;base64,{b64}';a.download='{name}';document.body.appendChild(a);a.click();a.remove();");
+        }
+        catch (Exception ex) { Msg = "No se pudo generar el reporte: " + ex.Message; }
+        finally { IsGenerating = false; }
+    }
+
+    async Task<byte[]?> ReadAssetAsync(string relative)
+    {
+        var root = string.IsNullOrWhiteSpace(Env.WebRootPath)
+            ? Path.Combine(AppContext.BaseDirectory, "wwwroot")
+            : Env.WebRootPath;
+        var path = Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar));
+        return File.Exists(path) ? await File.ReadAllBytesAsync(path) : null;
     }
 
     DateTime? Min => Events.Where(e => e.OccurredAt.HasValue).Select(e => e.OccurredAt).Min();
@@ -264,13 +307,55 @@
         }
     }
 
-    double Zoom = 1;
-    const double MinZoom = 1, MaxZoom = 40;
-    void ZoomIn() => Zoom = Math.Min(MaxZoom, Zoom * 1.5);
-    void ZoomOut() => Zoom = Math.Max(MinZoom, Zoom / 1.5);
-    void Fit() => Zoom = 1;
+    // Escala automática: más ancho cuantos más eventos, para que los puntos respiren.
+    int TimelineMinWidth => Math.Clamp(220 + Events.Count * 22, 900, 2600);
 
-    int TimelineMinWidth => (int)Math.Min(24000, Math.Max(760, 760 * Zoom) + Lanes.Count * 4);
+    private sealed record DotPos(TraceEventDto Event, List<TraceEventDto> Events, double Left, int Row, int Count);
+    Dictionary<string, List<DotPos>> Layout = new(StringComparer.OrdinalIgnoreCase);
+
+    // Agrupa eventos del mismo instante en un punto con contador y reparte
+    // los grupos que caen muy juntos en filas, para que se vean completos.
+    Dictionary<string, List<DotPos>> BuildLayout()
+    {
+        var result = new Dictionary<string, List<DotPos>>(StringComparer.OrdinalIgnoreCase);
+        var trackWidth = Math.Max(320, TimelineMinWidth - 156);
+        var minPct = 100.0 * 20 / trackWidth;
+
+        foreach (var lane in Lanes)
+        {
+            var rowEnds = new List<double>();
+            var placed = new List<DotPos>();
+            var groups = lane.Value
+                .GroupBy(e => e.OccurredAt)
+                .Select(g => new
+                {
+                    Left = Pct(g.First()),
+                    Events = g.OrderBy(e => e.TableName, StringComparer.OrdinalIgnoreCase)
+                               .ThenBy(e => e.Fuente, StringComparer.OrdinalIgnoreCase)
+                               .ToList()
+                })
+                .OrderBy(g => g.Left)
+                .ToList();
+
+            foreach (var g in groups)
+            {
+                var row = 0;
+                while (row < rowEnds.Count && g.Left - rowEnds[row] < minPct) row++;
+                if (row == rowEnds.Count) rowEnds.Add(g.Left); else rowEnds[row] = g.Left;
+                placed.Add(new DotPos(g.Events[0], g.Events, g.Left, row, g.Events.Count));
+            }
+            result[lane.Key] = placed;
+        }
+        return result;
+    }
+
+    // En un punto agrupado, cada clic recorre los eventos de ese instante.
+    void Pick(DotPos dot)
+    {
+        if (dot.Events.Count <= 1) { Selected = dot.Event; return; }
+        var idx = Selected is null ? -1 : dot.Events.IndexOf(Selected);
+        Selected = dot.Events[(idx + 1) % dot.Events.Count];
+    }
 
     // Marcas del eje: más cantidad y más finas al acercar.
     List<DateTime> Ticks

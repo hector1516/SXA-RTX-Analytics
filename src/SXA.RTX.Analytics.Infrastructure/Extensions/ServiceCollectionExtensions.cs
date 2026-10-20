@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SXA.RTX.Analytics.Application.Abstractions;
@@ -35,6 +35,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IConfigExportService, ConfigExportService>();
         services.AddScoped<IDynamicQueryService, DynamicQueryService>();
         services.AddScoped<ITraceService, TraceService>();
+        services.AddScoped<ITraceReportService, TraceReportService>();
+        services.AddScoped<IRelationReportService, RelationReportService>();
         services.AddScoped<IExportService, ExportService>();
         return services;
     }
