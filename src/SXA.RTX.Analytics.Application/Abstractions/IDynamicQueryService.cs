@@ -32,4 +32,5 @@ public interface IExportService
 {
     Task<byte[]> ExportExcelAsync(QueryResult result, string sheetName, CancellationToken ct = default);
     Task<byte[]> ExportPdfAsync(QueryResult result, string title, CancellationToken ct = default);
+    Task<byte[]> ExportCsvAsync(QueryResult result, CancellationToken ct = default);
 }

@@ -1,4 +1,4 @@
-@page "/configuration"
+﻿@page "/configuration"
 @attribute [Authorize(Roles = "Administrador")]
 @using Microsoft.AspNetCore.Authorization
 @using SXA.RTX.Analytics.Application.Abstractions
@@ -29,8 +29,8 @@
     <li class="nav-item"><button class="nav-link @(ActiveTab==0?"active":"")" @onclick="() => ActiveTab=0">SQL Server</button></li>
     <li class="nav-item"><button class="nav-link @(ActiveTab==1?"active":"")" @onclick="() => ActiveTab=1">MAPICS (ODBC)</button></li>
     <li class="nav-item"><button class="nav-link @(ActiveTab==2?"active":"")" @onclick="() => ActiveTab=2">Tablas sistema</button></li>
-    <li class="nav-item"><button class="nav-link @(ActiveTab==3?"active":"")" @onclick="() => { ActiveTab=3; _ = LoadEquipos(); }">Equipos</button></li>
-    <li class="nav-item"><button class="nav-link @(ActiveTab==4?"active":"")" @onclick="() => { ActiveTab=4; _ = LoadTablas(); }">Tablas VTI/VTech</button></li>
+    <li class="nav-item"><button class="nav-link @(ActiveTab==3?"active":"")" @onclick="async () => { ActiveTab=3; await LoadEquipos(); }">Equipos</button></li>
+    <li class="nav-item"><button class="nav-link @(ActiveTab==4?"active":"")" @onclick="async () => { ActiveTab=4; await LoadTablas(); }">Tablas VTI/VTech</button></li>
     <li class="nav-item"><button class="nav-link @(ActiveTab==5?"active":"")" @onclick="() => ActiveTab=5">Import/Export</button></li>
 </ul>
 
@@ -53,7 +53,7 @@
                 <button class="btn btn-primary" @onclick="TestSql" disabled="@IsTestingSql">@if (IsTestingSql) { <span class="spinner-border spinner-border-sm"></span> @(" Probando...") } else { @("Probar conexión") }</button>
                 <button class="btn btn-outline-primary" @onclick="LoadDatabases" disabled="@(!SqlTestOk)">Cargar bases (carpetas)</button>
                 <button class="btn btn-primary" @onclick="SaveConnections" disabled="@IsSavingConnections">@if (IsSavingConnections) { <span class="spinner-border spinner-border-sm"></span> @(" Guardando...") } else { @("Guardar conexión") }</button>
-                <button class="btn btn-outline-secondary" @onclick="() => { ActiveTab=3; _ = LoadEquipos(); }">Ir a Equipos →</button>
+                <button class="btn btn-outline-secondary" @onclick="async () => { ActiveTab=3; await LoadEquipos(); }">Ir a Equipos →</button>
             </div>
             @if (!string.IsNullOrEmpty(SqlTestMsg)) { <div class="alert @(SqlTestOk ? "alert-success" : "alert-danger") mt-3 py-2 small">@SqlTestMsg</div> }
             @if (!string.IsNullOrEmpty(SaveConnMsg)) { <div class="alert @(SaveConnOk ? "alert-success" : "alert-danger") mt-3 py-2 small">@SaveConnMsg</div> }
@@ -158,61 +158,75 @@ else if (ActiveTab == 4)
 {
     <div class="card">
         <div class="card-body">
-            <h5 class="card-title">Tablas VTI / VTech — selección para Analytics</h5>
-            <p class="text-muted small">Elige de <code>INFORMATION_SCHEMA.TABLES</code> qué tablas usa Analytics por Tipo. Solo esas se ofrecerán en reportes.</p>
-            <div class="d-flex gap-2 mb-3">
+            <h5 class="card-title">Tablas y fuentes</h5>
+            <p class="text-muted small">Marca las tablas que usa Analytics, asígnalas a una <strong>fuente</strong> (VTI, Packout, Cajas, Producción...), ponles título y nickname a las columnas, e indica qué columna es el <strong>número de serie</strong> y cuál la <strong>fecha</strong> (para la línea de tiempo).</p>
+            <div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
                 <button class="btn btn-primary btn-sm" @onclick="LoadTablas" disabled="@IsLoadingTablas">@if (IsLoadingTablas) { <span class="spinner-border spinner-border-sm"></span> } else { @("Cargar tablas") }</button>
-                <button class="btn btn-success btn-sm" @onclick="SaveTablas" disabled="@IsSavingTablas">Guardar selección</button>
+                <button class="btn btn-primary btn-sm" @onclick="SaveTablas" disabled="@IsSavingTablas">Guardar</button>
+                <span class="text-muted small">@SelectedCount() tabla(s) seleccionada(s)</span>
             </div>
             @if (!string.IsNullOrEmpty(TablasMsg)) { <div class="alert @(TablasOk?"alert-success":"alert-danger") py-2 small">@TablasMsg</div> }
             @if (AllTables.Count == 0) { <div class="text-muted small">Pulsa “Cargar tablas” (usa la cadena SQL de la pestaña SQL Server).</div> }
             else
             {
-                <p class="text-muted small">Marca el tipo de cada tabla, ponle un título amigable (lo que verán los usuarios en vez del nombre SQL) y, si quieres, limita las columnas visibles. Vacío en “columnas” = mostrar todas.</p>
-                <div class="table-responsive"><table class="table table-sm small align-middle"><thead><tr><th style="width:34%">Tabla SQL</th><th style="width:30%">Título amigable</th><th class="text-center">VTI</th><th class="text-center">VTech</th><th class="text-center">Columnas</th></tr></thead><tbody>
+                <datalist id="fuentesList">@foreach (var f in FuentesSugeridas) { <option value="@f"></option> }</datalist>
+                <div class="table-responsive"><table class="table table-sm small align-middle">
+                    <thead><tr><th style="width:44px" class="text-center">Usar</th><th style="width:30%">Tabla SQL</th><th style="width:18%">Fuente</th><th style="width:22%">Título</th><th class="text-center">Columnas</th></tr></thead>
+                    <tbody>
                     @foreach (var t in AllTables)
                     {
-                        var hasVisible = TableVisible.TryGetValue(t, out var visSet) && visSet.Count > 0;
+                        var e = Edit(t);
                         <tr>
+                            <td class="text-center"><input type="checkbox" checked="@e.Used" @onchange="ev => SetUsed(t, (bool)(ev.Value ?? false))" /></td>
                             <td class="font-monospace" style="word-break:break-all">@t</td>
-                            <td><input class="form-control form-control-sm" value="@GetTitle(t)" placeholder="@t" @onchange="e => SetTitle(t, (e.Value ?? string.Empty).ToString())" /></td>
-                            <td class="text-center"><input type="checkbox" checked="@IsTableSelected(t, EquipoTipo.VTI)" @onchange="e => ToggleTabla(t, EquipoTipo.VTI, (bool)(e.Value ?? false))" /></td>
-                            <td class="text-center"><input type="checkbox" checked="@IsTableSelected(t, EquipoTipo.VTech)" @onchange="e => ToggleTabla(t, EquipoTipo.VTech, (bool)(e.Value ?? false))" /></td>
+                            <td><input class="form-control form-control-sm" list="fuentesList" value="@e.Fuente" placeholder="VTI, Packout..." @onchange="ev => SetFuente(t, ev.Value?.ToString())" /></td>
+                            <td><input class="form-control form-control-sm" value="@e.Title" placeholder="@t" @onchange="ev => SetTitle(t, ev.Value?.ToString())" /></td>
                             <td class="text-center">
-                                <button class="btn btn-sm @(hasVisible ? "btn-primary" : "btn-outline-secondary")" @onclick="() => LoadColumns(t)">
+                                <button class="btn btn-sm @(e.Columns.Count>0 ? "btn-outline-primary" : "btn-outline-secondary")" @onclick="() => LoadColumns(t)">
                                     @if (LoadingColumns.Contains(t)) { <span class="spinner-border spinner-border-sm"></span> }
-                                    else if (TableColumns.ContainsKey(t)) { @(hasVisible ? $"{visSet!.Count}/{TableColumns[t].Count}" : "Todas") }
+                                    else if (e.Columns.Count > 0) { @($"{e.Visible.Count}/{e.Columns.Count}") }
                                     else { @("Columnas") }
                                 </button>
                             </td>
                         </tr>
-                        @if (TableColumns.TryGetValue(t, out var cols))
+                        @if (e.Columns.Count > 0)
                         {
                             <tr class="bg-light">
                                 <td colspan="5" class="py-2">
-                                    <div class="d-flex flex-wrap gap-2">
-                                        @foreach (var c in cols)
+                                    <div class="d-flex flex-wrap gap-3 mb-2">
+                                        <div>
+                                            <label class="form-label small mb-1">Columna serie</label>
+                                            <select class="form-select form-select-sm" value="@e.Serial" @onchange="ev => SetSerial(t, ev.Value?.ToString())">
+                                                <option value="">—</option>
+                                                @foreach (var c in e.Columns) { <option value="@c.Name">@c.Name</option> }
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="form-label small mb-1">Columna fecha</label>
+                                            <select class="form-select form-select-sm" value="@e.DateCol" @onchange="ev => SetDate(t, ev.Value?.ToString())">
+                                                <option value="">—</option>
+                                                @foreach (var c in e.Columns) { <option value="@c.Name">@c.Name</option> }
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex flex-column gap-1">
+                                        @foreach (var c in e.Columns)
                                         {
-                                            <label class="d-flex align-items-center gap-1 border rounded-3 px-2 py-1 bg-white">
-                                                <input type="checkbox" checked="@IsColVisible(t, c.Name)" @onchange="e => ToggleVisibleCol(t, c.Name, (bool)(e.Value ?? false))" />
-                                                @c.Name <span class="text-muted" style="font-size:.65rem">(@c.DataType)</span>
-                                            </label>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <input type="checkbox" checked="@e.Visible.Contains(c.Name)" @onchange="ev => SetVisible(t, c.Name, (bool)(ev.Value ?? false))" />
+                                                <span class="font-monospace" style="font-size:.75rem; min-width:190px">@c.Name</span>
+                                                <span class="text-muted" style="font-size:.65rem; min-width:70px">@c.DataType</span>
+                                                <input class="form-control form-control-sm" style="max-width:240px" value="@e.Nicks.GetValueOrDefault(c.Name)" placeholder="nickname" @onchange="ev => SetNick(t, c.Name, ev.Value?.ToString())" />
+                                            </div>
                                         }
                                     </div>
-                                    @if (hasVisible)
-                                    {
-                                        <button class="btn btn-link btn-sm p-0 mt-1" @onclick="() => TableVisible.Remove(t)">↩ Ver todas las columnas</button>
-                                    }
-                                    else
-                                    {
-                                        <div class="form-text mb-0">Sin marcar = se muestran todas.</div>
-                                    }
+                                    <div class="form-text mb-0">Sin columnas marcadas = se muestran todas. El nickname reemplaza el nombre real en la app y en las exportaciones.</div>
                                 </td>
                             </tr>
                         }
                     }
-                </tbody></table></div>
-                <div class="text-muted small">Seleccionadas: VTI @SelectedCount(EquipoTipo.VTI) / VTech @SelectedCount(EquipoTipo.VTech)</div>
+                    </tbody>
+                </table></div>
             }
         </div>
     </div>
@@ -254,43 +268,69 @@ else if (ActiveTab == 5)
     string EqDeviceId = ""; string EqNombre = ""; string EqArea = ""; bool IsSavingEquipo = false; string? EqMsg; bool EqOk = false;
     List<string> Areas => Equipos.Select(e => e.Area).Distinct().ToList();
 
-    // Tablas VTI/VTech
-    List<string> AllTables = new(); HashSet<(string, EquipoTipo)> Selected = new(); bool IsLoadingTablas = false; bool IsSavingTablas = false; string? TablasMsg; bool TablasOk = false;
-    Dictionary<string, string> TableTitles = new(StringComparer.OrdinalIgnoreCase);
-    Dictionary<string, List<ColumnInfo>> TableColumns = new(StringComparer.OrdinalIgnoreCase);
-    Dictionary<string, HashSet<string>> TableVisible = new(StringComparer.OrdinalIgnoreCase);
+    // Tablas y fuentes
+    public sealed class TableEdit
+    {
+        public bool Used;
+        public string Fuente = "";
+        public string Title = "";
+        public string Serial = "";
+        public string DateCol = "";
+        public List<ColumnInfo> Columns = new();
+        public HashSet<string> Visible = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, string> Nicks = new(StringComparer.OrdinalIgnoreCase);
+    }
+    List<string> AllTables = new();
+    Dictionary<string, TableEdit> Edits = new(StringComparer.OrdinalIgnoreCase);
+    bool IsLoadingTablas = false; bool IsSavingTablas = false; string? TablasMsg; bool TablasOk = false;
     HashSet<string> LoadingColumns = new(StringComparer.OrdinalIgnoreCase);
+    static readonly string[] FuentesSugeridas = { "VTI", "Producción", "Packout", "Cajas", "Cabeceras", "Alarmas", "Logs", "Catálogos", "Equipos" };
 
     // Import/Export
     bool IsExporting = false; bool IsImporting = false; string? ImportExportMsg; bool ImportExportOk = false; string? ExportPreview;
 
     protected override async Task OnInitializedAsync() { await LoadConnections(); await LoadTables(); await LoadEquipos(); }
 
+    // Contraseña leída de la conexión configurada. No se muestra en el formulario,
+    // pero se usa para construir la cadena mientras el admin no escriba otra.
+    string _savedPassword = "";
+
     string BuildSqlConnectionString() => SqlAuth=="win" ? $"Server={SqlServer};Database={SqlDatabase};Trusted_Connection=True;Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};" : $"Server={SqlServer};Database={SqlDatabase};User Id={SqlUser};Password=***;Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};";
-    string BuildSqlConnectionStringReal() => SqlAuth=="win" ? $"Server={SqlServer};Database={SqlDatabase};Trusted_Connection=True;Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};" : $"Server={SqlServer};Database={SqlDatabase};User Id={SqlUser};Password={SqlPassword};Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};";
+    string BuildSqlConnectionStringReal()
+    {
+        if (SqlAuth == "win")
+            return $"Server={SqlServer};Database={SqlDatabase};Trusted_Connection=True;Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};";
+        var pwd = string.IsNullOrEmpty(SqlPassword) ? _savedPassword : SqlPassword;
+        return $"Server={SqlServer};Database={SqlDatabase};User Id={SqlUser};Password={pwd};Encrypt={(SqlEncrypt?"True":"False")};TrustServerCertificate={(SqlTrust?"True":"False")};";
+    }
 
     // Rellena los campos con lo ya guardado (o lo que haya en appsettings). La
-    // contraseña no se lee de la base (DPAPI): si hay una guardada, hay que
-    // reescribirla para sobrescribirla.
+    // contraseña no se muestra; se conserva internamente para no romper la conexión.
     async Task LoadConnections()
     {
         try
         {
             var s = await DataSources.GetAsync();
-            ApplyConnectionString(s.ConfigurationConnectionString, ref SqlServer, ref SqlDatabase, ref SqlUser);
+            ApplyConnectionString(s.ConfigurationConnectionString);
             OdbcConnectionString = s.OdbcConnectionString ?? OdbcConnectionString;
             ConnectionsLoaded = true;
         }
         catch { /* la app arranca igual con appsettings */ }
     }
 
-    void ApplyConnectionString(string? cs, ref string server, ref string database, ref string user)
+    void ApplyConnectionString(string? cs)
     {
         if (string.IsNullOrWhiteSpace(cs)) return;
         try
         {
             var b = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(cs);
-            server = b.DataSource; database = b.InitialCatalog; user = b.UserID ?? "";
+            SqlServer = b.DataSource;
+            SqlDatabase = b.InitialCatalog;
+            SqlUser = b.UserID ?? "";
+            SqlAuth = b.IntegratedSecurity ? "win" : "sql";
+            SqlEncrypt = b.Encrypt;
+            SqlTrust = b.TrustServerCertificate;
+            _savedPassword = b.Password ?? "";
         }
         catch { /* cadena no parseable: se deja lo que haya */ }
     }
@@ -335,37 +375,72 @@ else if (ActiveTab == 5)
     IEnumerable<EquipoDto> GetEquiposByTipo(string tipo, bool conNombre){ var filtered = Equipos.Where(e=> (e.TipoSync?.ToString()??"")==tipo); return conNombre ? filtered : Enumerable.Empty<EquipoDto>(); }
     IEnumerable<CatalogDeviceDto> GetCatalogByTipo(string tipo, bool _con){ var eqSet = Equipos.Select(e=>e.DeviceId).ToHashSet(); return Catalog.Where(c=> (c.TipoMaquina??"")==tipo && !eqSet.Contains(c.DeviceId)); }
 
+    TableEdit Edit(string t)
+    {
+        if (!Edits.TryGetValue(t, out var e)) { e = new TableEdit(); Edits[t] = e; }
+        return e;
+    }
+    int SelectedCount() => Edits.Values.Count(e => e.Used);
+    void SetUsed(string t, bool v) => Edit(t).Used = v;
+    void SetFuente(string t, string? v) => Edit(t).Fuente = v ?? "";
+    void SetTitle(string t, string? v) => Edit(t).Title = v ?? "";
+    void SetSerial(string t, string? v) => Edit(t).Serial = v ?? "";
+    void SetDate(string t, string? v) => Edit(t).DateCol = v ?? "";
+    void SetVisible(string t, string col, bool on) { var e = Edit(t); if (on) e.Visible.Add(col); else e.Visible.Remove(col); }
+    void SetNick(string t, string col, string? v)
+    {
+        var e = Edit(t);
+        if (string.IsNullOrWhiteSpace(v)) e.Nicks.Remove(col); else e.Nicks[col] = v.Trim();
+    }
+
     async Task LoadTablas(){ IsLoadingTablas=true; try {
         AllTables=(await TablasService.ListAllTablesAsync(BuildSqlConnectionStringReal())).ToList();
         var cfg=await TablasService.GetConfigAsync();
-        Selected=new HashSet<(string, EquipoTipo)>(cfg.Select(x=>(x.TableName, x.Tipo)));
-        TableTitles = cfg.Where(x=>!string.IsNullOrWhiteSpace(x.DisplayName)).ToDictionary(x=>x.TableName, x=>x.DisplayName!, StringComparer.OrdinalIgnoreCase);
-        TableVisible = cfg.Where(x=>x.VisibleColumns.Count>0).ToDictionary(x=>x.TableName, x=>new HashSet<string>(x.VisibleColumns, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+        Edits = new Dictionary<string, TableEdit>(StringComparer.OrdinalIgnoreCase);
+        foreach (var c in cfg)
+        {
+            var e = new TableEdit { Used = true, Fuente = c.Fuente ?? "", Title = c.DisplayName ?? "", Serial = c.SerialColumn ?? "", DateCol = c.DateColumn ?? "" };
+            foreach (var col in c.Columnas)
+            {
+                e.Columns.Add(new ColumnInfo(col.ColumnName, "", true));
+                e.Visible.Add(col.ColumnName);
+                if (!string.IsNullOrWhiteSpace(col.DisplayName)) e.Nicks[col.ColumnName] = col.DisplayName!;
+            }
+            Edits[c.TableName] = e;
+        }
+        foreach (var t in AllTables) Edit(t);
     } finally { IsLoadingTablas=false; } }
-    bool IsTableSelected(string t, EquipoTipo tipo)=> Selected.Contains((t,tipo));
-    void ToggleTabla(string t, EquipoTipo tipo, bool isChecked){ if(isChecked) Selected.Add((t,tipo)); else Selected.Remove((t,tipo)); }
-    int SelectedCount(EquipoTipo tipo)=> Selected.Count(x=>x.Item2==tipo);
-    string GetTitle(string t) => TableTitles.TryGetValue(t, out var v) ? v : "";
-    void SetTitle(string t, string v){ if(string.IsNullOrWhiteSpace(v)) TableTitles.Remove(t); else TableTitles[t]=v; }
+
     async Task LoadColumns(string t){
-        if (TableColumns.ContainsKey(t)) return;
         LoadingColumns.Add(t);
-        try { var cols = await QueryService.GetColumnsAsync(BuildSqlConnectionStringReal(), t); TableColumns[t] = cols.ToList(); }
+        try
+        {
+            var cols = (await QueryService.GetColumnsAsync(BuildSqlConnectionStringReal(), t)).ToList();
+            var e = Edit(t);
+            e.Columns = cols;
+            if (e.Visible.Count == 0) foreach (var c in cols) e.Visible.Add(c.Name);
+        }
         finally { LoadingColumns.Remove(t); }
     }
-    bool IsColVisible(string t, string col) => TableVisible.TryGetValue(t, out var set) ? set.Contains(col) : false;
-    void ToggleVisibleCol(string t, string col, bool on){
-        if (!TableVisible.TryGetValue(t, out var set)) { set = new HashSet<string>(StringComparer.OrdinalIgnoreCase); TableVisible[t]=set; }
-        if(on) set.Add(col); else set.Remove(col);
-    }
+
     async Task SaveTablas(){
         IsSavingTablas=true; TablasMsg=null;
         try {
-            var dtos = Selected.Select(s => new TablaConfigDto(
-                s.Item1, s.Item2,
-                TableTitles.TryGetValue(s.Item1, out var title) ? title : null,
-                TableVisible.TryGetValue(s.Item1, out var cols) ? cols.ToList() : new List<string>())
-            ).ToList();
+            var dtos = Edits.Where(kv => kv.Value.Used).Select(kv =>
+            {
+                var e = kv.Value;
+                var cols = e.Columns
+                    .Where(c => e.Visible.Contains(c.Name) || e.Nicks.ContainsKey(c.Name))
+                    .Select(c => new TablaColumnaDto(c.Name, e.Nicks.GetValueOrDefault(c.Name)))
+                    .ToList();
+                return new TablaConfigDto(
+                    kv.Key,
+                    string.IsNullOrWhiteSpace(e.Fuente) ? "Sin clasificar" : e.Fuente.Trim(),
+                    string.IsNullOrWhiteSpace(e.Title) ? null : e.Title.Trim(),
+                    string.IsNullOrWhiteSpace(e.Serial) ? null : e.Serial,
+                    string.IsNullOrWhiteSpace(e.DateCol) ? null : e.DateCol,
+                    cols);
+            }).ToList();
             var (ok,msg)=await TablasService.SaveAsync(dtos);
             TablasOk=ok; TablasMsg=msg;
         } catch(Exception ex){ TablasOk=false; TablasMsg="No se pudo guardar: "+ex.Message; }

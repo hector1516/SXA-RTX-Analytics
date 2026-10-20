@@ -41,9 +41,14 @@ public sealed class ConfigExportService : IConfigExportService
         var tablasDto = tablas.Select(t => new
         {
             t.TableName,
-            t.Tipo,
+            t.Fuente,
             t.DisplayName,
-            Columnas = t.Columnas.Select(c => c.ColumnName).OrderBy(n => n).ToList(),
+            t.SerialColumn,
+            t.DateColumn,
+            Columnas = t.Columnas
+                .OrderBy(c => c.ColumnName)
+                .Select(c => new { c.ColumnName, c.DisplayName })
+                .ToList(),
         }).ToList();
         var usuarios = await _db.Set<AppUser>().AsNoTracking()
             .Select(u => new { u.Username, u.DisplayName, u.Role, u.IsActive, u.CreatedAtUtc })
@@ -118,13 +123,24 @@ public sealed class ConfigExportService : IConfigExportService
                     var cfg = new TablaConfig
                     {
                         TableName = tableName,
-                        Tipo = el.TryGetProperty("Tipo", out var t) && t.ValueKind == JsonValueKind.Number ? t.GetInt32() : 1,
+                        Fuente = el.TryGetProperty("Fuente", out var f) && f.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(f.GetString())
+                            ? f.GetString()! : "Sin clasificar",
                         DisplayName = el.TryGetProperty("DisplayName", out var dn) && dn.ValueKind == JsonValueKind.String ? dn.GetString() : null,
+                        SerialColumn = el.TryGetProperty("SerialColumn", out var sc) && sc.ValueKind == JsonValueKind.String ? sc.GetString() : null,
+                        DateColumn = el.TryGetProperty("DateColumn", out var dc) && dc.ValueKind == JsonValueKind.String ? dc.GetString() : null,
                     };
                     if (el.TryGetProperty("Columnas", out var colEl) && colEl.ValueKind == JsonValueKind.Array)
                         foreach (var c in colEl.EnumerateArray())
+                        {
                             if (c.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(c.GetString()))
                                 cfg.Columnas.Add(new TablaColumna { ColumnName = c.GetString()! });
+                            else if (c.ValueKind == JsonValueKind.Object && c.TryGetProperty("ColumnName", out var cn) && cn.ValueKind == JsonValueKind.String)
+                                cfg.Columnas.Add(new TablaColumna
+                                {
+                                    ColumnName = cn.GetString()!,
+                                    DisplayName = c.TryGetProperty("DisplayName", out var cdn) && cdn.ValueKind == JsonValueKind.String ? cdn.GetString() : null,
+                                });
+                        }
                     _db.Set<TablaConfig>().Add(cfg);
                     tablas++;
                 }

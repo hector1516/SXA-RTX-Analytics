@@ -19,17 +19,29 @@ public sealed class Equipo : BaseEntity
 public sealed class TablaConfig : BaseEntity
 {
     public required string TableName { get; set; } // schema.table
-    public int Tipo { get; set; } // 1=VTI 2=VTech
-    public string? DisplayName { get; set; } // título amigable mostrado al usuario; null = mostrar TableName
+
+    /// <summary>Fuente/aplicación que escribe la tabla (libre): VTI, Packout, Cajas, Foam, etc.</summary>
+    public required string Fuente { get; set; }
+
+    /// <summary>Título amigable de la tabla; null = TableName.</summary>
+    public string? DisplayName { get; set; }
+
+    /// <summary>Columna que contiene el número de serie (para trazabilidad). null = no aplica.</summary>
+    public string? SerialColumn { get; set; }
+
+    /// <summary>Columna de fecha principal de la tabla. null = autodetectar.</summary>
+    public string? DateColumn { get; set; }
+
     public ICollection<TablaColumna> Columnas { get; set; } = new List<TablaColumna>();
 }
 
 /// <summary>
-/// Columnas visibles de una tabla operacional. Vacío = mostrar todas.
-/// Solo afecta a la visualización de /query; no cambia el esquema ni los datos.
+/// Columnas configuradas de una tabla operacional. Las filas marcan las columnas
+/// visibles; vacío = mostrar todas. El nickname es solo para mostrar.
 /// </summary>
 public sealed class TablaColumna : BaseEntity
 {
     public Guid TablaConfigId { get; set; }
     public required string ColumnName { get; set; }
+    public string? DisplayName { get; set; }
 }

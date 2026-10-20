@@ -160,6 +160,17 @@ var origin = ResultEnricher.SanitizeIdentifier(request.OriginColumn);
 
 public sealed class ExportService : IExportService
 {
+    public Task<byte[]> ExportCsvAsync(QueryResult result, CancellationToken ct = default)
+    {
+        static string Cell(string? s) => "\"" + (s ?? "").Replace("\"", "\"\"") + "\"";
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine(string.Join(",", result.Columns.Select(c => Cell(c.DisplayName))));
+        foreach (var row in result.Rows)
+            sb.AppendLine(string.Join(",", row.Select(v => Cell(v?.ToString()))));
+        var bytes = new System.Text.UTF8Encoding(true).GetBytes(sb.ToString());
+        return Task.FromResult(bytes);
+    }
+
     public Task<byte[]> ExportExcelAsync(QueryResult result, string sheetName, CancellationToken ct = default)
     {
         using var wb = new ClosedXML.Excel.XLWorkbook();

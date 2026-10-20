@@ -1,0 +1,308 @@
+@page "/trace"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using SXA.RTX.Analytics.Application.Abstractions
+@inject ITraceService TraceService
+@inject ITablasConfigService TablasService
+@inject IDataSourceService DataSources
+@inject IConfigurationService Settings
+
+<PageTitle>Trazabilidad — SXA-RTX Analytics</PageTitle>
+
+<div class="rx-page-head">
+    <div>
+        <div class="rx-eyebrow">Trazabilidad</div>
+        <h1>Línea de tiempo por número de serie</h1>
+        <div class="text-muted small">Historial del producto a través de todas las fuentes configuradas.</div>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small fw-bold">Número de serie</label>
+                <input class="form-control font-monospace" @bind="Serial" @bind:event="oninput" placeholder="Ej. MY26L083473" @onkeydown="OnKey" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Desde</label>
+                <input type="datetime-local" class="form-control" @bind="From" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Hasta</label>
+                <input type="datetime-local" class="form-control" @bind="To" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Fuente</label>
+                <select class="form-select" @bind="FiltroFuente">
+                    <option value="">Todas</option>
+                    @foreach (var f in Fuentes) { <option value="@f">@f</option> }
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button class="btn btn-primary w-100" @onclick="Buscar" disabled="@IsSearching">
+                    @if (IsSearching) { <span class="spinner-border spinner-border-sm"></span> } else { <Icon Name="search" Size="16" /> } Buscar
+                </button>
+            </div>
+        </div>
+        @if (!string.IsNullOrEmpty(Msg)) { <div class="alert alert-danger mt-3 py-2 small mb-0">@Msg</div> }
+    </div>
+</div>
+
+@if (Searched)
+{
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body rx-kpi">
+            <span class="rx-kpi__label">Eventos</span><span class="rx-kpi__value">@Events.Count</span>
+        </div></div></div>
+        <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body rx-kpi">
+            <span class="rx-kpi__label">Fuentes</span><span class="rx-kpi__value">@Lanes.Count</span>
+        </div></div></div>
+        <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body rx-kpi">
+            <span class="rx-kpi__label">Primer evento</span><span class="rx-kpi__value" style="font-size:1.05rem">@(Min?.ToString("yyyy-MM-dd HH:mm") ?? "—")</span>
+        </div></div></div>
+        <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body rx-kpi">
+            <span class="rx-kpi__label">Duración</span><span class="rx-kpi__value" style="font-size:1.05rem">@DurationText</span>
+        </div></div></div>
+    </div>
+
+    @if (Events.Count == 0)
+    {
+        <div class="card"><div class="card-body text-center text-muted py-5">
+            <Icon Name="search" Size="28" />
+            <div class="mt-2">No se encontraron eventos para ese número de serie.</div>
+            <div class="small mt-1">Verifica que las tablas tengan configurada la columna serie y fecha en Configuración → Tablas y fuentes.</div>
+        </div></div>
+    }
+    else
+    {
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Línea de tiempo</span>
+                <span class="text-muted small">@Serial</span>
+            </div>
+            <div class="card-body">
+                <div class="tl-window">
+                    <div class="tl" style="min-width:@(TimelineMinWidth)px">
+                        <div class="tl-axis">
+                            @foreach (var tick in Ticks) { <span>@tick.ToString("MM-dd HH:mm")</span> }
+                        </div>
+                        @foreach (var lane in Lanes)
+                        {
+                            <div class="tl-lane">
+                                <div class="tl-label" title="@lane.Key">@lane.Key <span class="tl-count">@lane.Value.Count</span></div>
+                                <div class="tl-track">
+                                    @foreach (var ev in lane.Value)
+                                    {
+                                        <button class="tl-dot @(Selected == ev ? "is-selected" : "")"
+                                                style="left:@Pct(ev).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)%"
+                                                @onclick="() => Selected = ev"
+                                                title="@(ev.OccurredAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "sin fecha") — @ev.TableDisplayName"></button>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap gap-3 mt-2 small text-muted">
+                    <span>Haz clic en un punto para ver el detalle.</span>
+                </div>
+            </div>
+        </div>
+
+        @if (Selected is not null)
+        {
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>@Selected.TableDisplayName <span class="text-muted small">· @Selected.Fuente</span></span>
+                    <span class="text-muted small">@(Selected.OccurredAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "sin fecha")</span>
+                </div>
+                <div class="card-body">
+                    <dl class="rx-detail">
+                        @foreach (var item in Detail(Selected)) { <div><dt>@item.Key</dt><dd>@item.Value</dd></div> }
+                    </dl>
+                </div>
+            </div>
+        }
+
+        <div class="card">
+            <div class="card-header">Todos los eventos</div>
+            <div class="table-responsive" style="max-height:420px; overflow:auto">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead style="position:sticky; top:0; background:var(--rx-surface)">
+                        <tr><th>Fecha</th><th>Fuente</th><th>Tabla</th><th>Detalle</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var ev in Events)
+                        {
+                            <tr @onclick="() => Selected = ev" style="cursor:pointer">
+                                <td class="text-nowrap">@(ev.OccurredAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "—")</td>
+                                <td><span class="rx-chip">@ev.Fuente</span></td>
+                                <td>@ev.TableDisplayName</td>
+                                <td class="text-muted small">@Summary(ev)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+}
+
+<style>
+    .tl-window { overflow-x: auto; padding: .25rem 0 .5rem; }
+    .tl { display: flex; flex-direction: column; gap: .35rem; }
+    .tl-axis { display: flex; justify-content: space-between; margin-left: 148px; font-size: .7rem; color: var(--rx-muted); }
+    .tl-lane { display: flex; align-items: center; }
+    .tl-label { flex: 0 0 140px; width: 140px; text-align: right; padding-right: 8px; font-size: .8rem; font-weight: 600; color: var(--rx-text-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tl-count { display: inline-block; margin-left: 4px; padding: 0 .35rem; border-radius: 999px; background: var(--rx-surface-2); color: var(--rx-muted); font-size: .65rem; }
+    .tl-track { position: relative; flex: 1; height: 46px; border-top: 1px solid var(--rx-border); }
+    .tl-track::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--rx-border); }
+    .tl-dot {
+        position: absolute; top: 50%; transform: translate(-50%, -50%);
+        width: 13px; height: 13px; border-radius: 50%;
+        background: var(--rx-accent); border: 2px solid var(--rx-surface);
+        padding: 0; cursor: pointer; transition: transform .1s ease;
+    }
+    .tl-dot:hover { transform: translate(-50%, -50%) scale(1.35); }
+    .tl-dot.is-selected { box-shadow: 0 0 0 4px var(--rx-accent-soft); transform: translate(-50%, -50%) scale(1.25); }
+    .rx-detail { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .5rem 1.25rem; margin: 0; }
+    .rx-detail dt { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--rx-muted); font-weight: 600; }
+    .rx-detail dd { margin: 0 0 .35rem; font-size: .85rem; word-break: break-word; }
+</style>
+
+@code {
+    string Serial = "";
+    string FiltroFuente = "";
+    DateTime? From, To;
+    bool IsSearching, Searched;
+    string? Msg;
+
+    string ConnStr = "";
+    List<TablaConfigDto> Configs = new();
+    List<TraceTableSpec> Specs = new();
+    List<TraceEventDto> Events = new();
+    Dictionary<string, List<TraceEventDto>> Lanes = new(StringComparer.OrdinalIgnoreCase);
+    TraceEventDto? Selected;
+
+    List<string> Fuentes => Specs.Select(s => s.Fuente)
+        .Where(f => !string.IsNullOrWhiteSpace(f))
+        .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(f => f).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var ds = await DataSources.GetAsync();
+            ConnStr = ds.EffectiveOperationalConnectionString ?? "";
+            Configs = (await TablasService.GetConfigAsync()).ToList();
+            Specs = Configs
+                .Where(c => !string.IsNullOrWhiteSpace(c.SerialColumn) && !string.IsNullOrWhiteSpace(c.DateColumn))
+                .Select(c => new TraceTableSpec(
+                    c.TableName,
+                    c.Fuente,
+                    string.IsNullOrWhiteSpace(c.DisplayName) ? c.TableName : c.DisplayName!,
+                    c.SerialColumn!,
+                    c.DateColumn!,
+                    c.Columnas.Select(x => x.ColumnName).ToList()))
+                .ToList();
+        }
+        catch (Exception ex) { Msg = ex.Message; }
+    }
+
+    async Task OnKey(KeyboardEventArgs e) { if (e.Key == "Enter") await Buscar(); }
+
+    async Task Buscar()
+    {
+        Msg = null; Selected = null; Events = new(); Lanes = new(); Searched = false;
+        if (string.IsNullOrWhiteSpace(Serial)) { Msg = "Escribe un número de serie."; return; }
+        if (Specs.Count == 0) { Msg = "No hay tablas con columna serie y fecha configuradas. Ve a Configuración → Tablas y fuentes."; return; }
+
+        IsSearching = true;
+        try
+        {
+            var specs = string.IsNullOrWhiteSpace(FiltroFuente)
+                ? Specs
+                : Specs.Where(s => string.Equals(s.Fuente, FiltroFuente, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            Events = (await TraceService.SearchAsync(ConnStr, Serial.Trim(), specs, From, To)).ToList();
+            Lanes = Events.GroupBy(e => string.IsNullOrWhiteSpace(e.Fuente) ? "Sin fuente" : e.Fuente, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+            Searched = true;
+        }
+        catch (Exception ex) { Msg = "Error: " + ex.Message; }
+        finally { IsSearching = false; }
+    }
+
+    DateTime? Min => Events.Where(e => e.OccurredAt.HasValue).Select(e => e.OccurredAt).Min();
+    DateTime? Max => Events.Where(e => e.OccurredAt.HasValue).Select(e => e.OccurredAt).Max();
+
+    string DurationText
+    {
+        get
+        {
+            if (Min is null || Max is null) return "—";
+            var d = Max.Value - Min.Value;
+            if (d.TotalDays >= 1) return $"{d.TotalDays:F1} días";
+            if (d.TotalHours >= 1) return $"{d.TotalHours:F1} h";
+            return $"{d.TotalMinutes:F0} min";
+        }
+    }
+
+    List<DateTime> Ticks
+    {
+        get
+        {
+            if (Min is null || Max is null) return new();
+            var span = Max.Value - Min.Value;
+            if (span <= TimeSpan.Zero) return new() { Min.Value };
+            return Enumerable.Range(0, 5).Select(i => Min.Value + TimeSpan.FromTicks((long)(span.Ticks * i / 4.0))).ToList();
+        }
+    }
+
+    int TimelineMinWidth => Math.Max(760, Lanes.Count * 8 + 760);
+
+    double Pct(TraceEventDto e)
+    {
+        if (e.OccurredAt is null || Min is null || Max is null) return 0;
+        var total = (Max.Value - Min.Value).TotalSeconds;
+        if (total <= 0) return 50;
+        return Math.Clamp((e.OccurredAt.Value - Min.Value).TotalSeconds / total * 100.0, 0, 100);
+    }
+
+    string Nick(TraceEventDto e, string column)
+    {
+        var cfg = Configs.FirstOrDefault(c => string.Equals(c.TableName, e.TableName, StringComparison.OrdinalIgnoreCase));
+        var col = cfg?.Columnas.FirstOrDefault(c => string.Equals(c.ColumnName, column, StringComparison.OrdinalIgnoreCase));
+        return string.IsNullOrWhiteSpace(col?.DisplayName) ? column : col!.DisplayName!;
+    }
+
+    IEnumerable<KeyValuePair<string, string?>> Detail(TraceEventDto e)
+    {
+        var cfg = Configs.FirstOrDefault(c => string.Equals(c.TableName, e.TableName, StringComparison.OrdinalIgnoreCase));
+        IEnumerable<string> cols = cfg is not null && cfg.Columnas.Count > 0
+            ? cfg.Columnas.Select(c => c.ColumnName)
+            : e.Values.Keys;
+
+        var n = 0;
+        foreach (var col in cols)
+        {
+            if (!e.Values.TryGetValue(col, out var val)) continue;
+            if (string.IsNullOrWhiteSpace(val)) continue;
+            yield return new KeyValuePair<string, string?>(Nick(e, col), val);
+            if (++n >= 16) yield break;
+        }
+    }
+
+    string Summary(TraceEventDto e)
+    {
+        var parts = new List<string>();
+        foreach (var item in Detail(e).Take(4))
+            parts.Add($"{item.Key}: {Trunc(item.Value, 40)}");
+        return string.Join(" · ", parts);
+    }
+
+    static string Trunc(string? s, int max) =>
+        string.IsNullOrEmpty(s) ? "" : (s.Length <= max ? s : s.Substring(0, max) + "…");
+}

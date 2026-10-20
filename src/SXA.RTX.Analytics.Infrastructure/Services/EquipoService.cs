@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+﻿using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SXA.RTX.Analytics.Application.Abstractions;
@@ -28,7 +28,12 @@ public sealed class EquipoService : IEquipoService
                 using var r = await cmd.ExecuteReaderAsync(ct);
                 var list = new List<CatalogDeviceDto>();
                 while (await r.ReadAsync(ct))
-                    list.Add(new CatalogDeviceDto(r.GetString(0), r.IsDBNull(1)?null:r.GetString(1), r.IsDBNull(2)?null:r.GetString(2), r.IsDBNull(3)?null:r.GetString(3), r.IsDBNull(4)?null:r.GetDateTime(4)));
+                    list.Add(new CatalogDeviceDto(
+                        r.GetString(0),
+                        r.IsDBNull(1) ? null : r.GetString(1),
+                        r.IsDBNull(2) ? null : r.GetString(2),
+                        r.IsDBNull(3) ? null : r.GetString(3),
+                        ToDate(r.IsDBNull(4) ? null : r.GetValue(4))));
                 if (list.Count > 0) return list;
             }
             catch (Exception ex) { _logger.LogWarning(ex, "No se pudo leer SXA_PCs, usando demo"); }
@@ -76,6 +81,13 @@ public sealed class EquipoService : IEquipoService
         await _db.SaveChangesAsync(ct);
         return (true, existing is null ? $"Equipo {deviceId} creado." : $"Equipo {deviceId} actualizado.");
     }
+
+    private static DateTime? ToDate(object? value)
+    {
+        if (value is null or DBNull) return null;
+        if (value is DateTime d) return d;
+        return DateTime.TryParse(value.ToString(), out var parsed) ? parsed : null;
+    }
 }
 
 public sealed class TablasConfigService : ITablasConfigService
@@ -112,9 +124,14 @@ public sealed class TablasConfigService : ITablasConfigService
             .OrderBy(x => x.TableName, StringComparer.OrdinalIgnoreCase)
             .Select(x => new TablaConfigDto(
                 x.TableName,
-                (EquipoTipo)x.Tipo,
+                x.Fuente ?? "",
                 string.IsNullOrWhiteSpace(x.DisplayName) ? null : x.DisplayName,
-                x.Columnas.Select(c => c.ColumnName).OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList()))
+                string.IsNullOrWhiteSpace(x.SerialColumn) ? null : x.SerialColumn,
+                string.IsNullOrWhiteSpace(x.DateColumn) ? null : x.DateColumn,
+                x.Columnas
+                    .OrderBy(c => c.ColumnName, StringComparer.OrdinalIgnoreCase)
+                    .Select(c => new TablaColumnaDto(c.ColumnName, string.IsNullOrWhiteSpace(c.DisplayName) ? null : c.DisplayName))
+                    .ToList()))
             .ToList();
     }
 
@@ -141,13 +158,20 @@ public sealed class TablasConfigService : ITablasConfigService
                 var row = new TablaConfig
                 {
                     TableName = sel.TableName,
-                    Tipo = (int)sel.Tipo,
+                    Fuente = string.IsNullOrWhiteSpace(sel.Fuente) ? "Sin clasificar" : sel.Fuente.Trim(),
                     DisplayName = string.IsNullOrWhiteSpace(sel.DisplayName) ? null : sel.DisplayName.Trim(),
+                    SerialColumn = string.IsNullOrWhiteSpace(sel.SerialColumn) ? null : sel.SerialColumn.Trim(),
+                    DateColumn = string.IsNullOrWhiteSpace(sel.DateColumn) ? null : sel.DateColumn.Trim(),
                 };
-                foreach (var col in (sel.VisibleColumns ?? Array.Empty<string>())
-                             .Where(c => !string.IsNullOrWhiteSpace(c))
-                             .Distinct(StringComparer.OrdinalIgnoreCase))
-                    row.Columnas.Add(new TablaColumna { ColumnName = col.Trim() });
+                foreach (var col in (sel.Columnas ?? Array.Empty<TablaColumnaDto>())
+                             .Where(c => !string.IsNullOrWhiteSpace(c.ColumnName))
+                             .GroupBy(c => c.ColumnName, StringComparer.OrdinalIgnoreCase)
+                             .Select(g => g.First()))
+                    row.Columnas.Add(new TablaColumna
+                    {
+                        ColumnName = col.ColumnName.Trim(),
+                        DisplayName = string.IsNullOrWhiteSpace(col.DisplayName) ? null : col.DisplayName.Trim(),
+                    });
                 _db.Set<TablaConfig>().Add(row);
             }
 

@@ -77,12 +77,14 @@ IF OBJECT_ID('dbo.SXA_RTX_TablasConfig','U') IS NULL
 BEGIN
     CREATE TABLE dbo.SXA_RTX_TablasConfig
     (
-        Id          uniqueidentifier NOT NULL CONSTRAINT PK_SXA_RTX_TablasConfig PRIMARY KEY,
-        TableName   nvarchar(260)    NOT NULL,
-        Tipo        int              NOT NULL, -- 1=VTI 2=VTech
-        DisplayName nvarchar(200)    NULL,      -- titulo amigable (null = mostrar TableName)
-        CreatedAtUtc datetime2       NOT NULL,
-        UpdatedAtUtc datetime2       NULL
+        Id           uniqueidentifier NOT NULL CONSTRAINT PK_SXA_RTX_TablasConfig PRIMARY KEY,
+        TableName    nvarchar(260)    NOT NULL,
+        Fuente       nvarchar(100)    NOT NULL,   -- VTI, Packout, Cajas, Cabeceras, Produccion...
+        DisplayName  nvarchar(200)    NULL,       -- nickname de la tabla (null = TableName)
+        SerialColumn nvarchar(200)    NULL,       -- columna con el numero de serie
+        DateColumn   nvarchar(200)    NULL,       -- columna de fecha principal
+        CreatedAtUtc datetime2        NOT NULL,
+        UpdatedAtUtc datetime2        NULL
     );
     CREATE UNIQUE INDEX IX_SXA_RTX_TablasConfig_TableName ON dbo.SXA_RTX_TablasConfig(TableName);
 END
@@ -96,6 +98,7 @@ BEGIN
         Id            uniqueidentifier NOT NULL CONSTRAINT PK_SXA_RTX_TablaColumnas PRIMARY KEY,
         TablaConfigId uniqueidentifier NOT NULL,
         ColumnName    nvarchar(200)    NOT NULL,
+        DisplayName   nvarchar(200)    NULL,      -- nickname de la columna
         CreatedAtUtc  datetime2        NOT NULL,
         UpdatedAtUtc  datetime2        NULL
     );

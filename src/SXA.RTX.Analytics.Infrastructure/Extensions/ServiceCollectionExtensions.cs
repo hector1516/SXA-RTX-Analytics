@@ -42,6 +42,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<BootstrapAdminService>();
         services.AddScoped<IConfigExportService, ConfigExportService>();
         services.AddScoped<IDynamicQueryService, DynamicQueryService>();
+        services.AddScoped<ITraceService, TraceService>();
         services.AddScoped<IExportService, ExportService>();
         return services;
     }

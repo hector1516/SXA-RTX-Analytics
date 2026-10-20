@@ -26,7 +26,10 @@ public sealed class TablaConfigConfiguration : IEntityTypeConfiguration<TablaCon
         b.HasKey(x => x.Id);
         b.HasIndex(x => x.TableName).IsUnique();
         b.Property(x => x.TableName).HasMaxLength(260).IsRequired();
+        b.Property(x => x.Fuente).HasMaxLength(100).IsRequired();
         b.Property(x => x.DisplayName).HasMaxLength(200);
+        b.Property(x => x.SerialColumn).HasMaxLength(200);
+        b.Property(x => x.DateColumn).HasMaxLength(200);
         b.HasMany(x => x.Columnas)
             .WithOne()
             .HasForeignKey(x => x.TablaConfigId)
@@ -42,5 +45,6 @@ public sealed class TablaColumnaConfiguration : IEntityTypeConfiguration<TablaCo
         b.HasKey(x => x.Id);
         b.HasIndex(x => new { x.TablaConfigId, x.ColumnName }).IsUnique();
         b.Property(x => x.ColumnName).HasMaxLength(200).IsRequired();
+        b.Property(x => x.DisplayName).HasMaxLength(200);
     }
 }

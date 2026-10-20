@@ -83,11 +83,17 @@ IF OBJECT_ID('dbo.SXA_RTX_TablasConfig','U') IS NULL
 CREATE TABLE dbo.SXA_RTX_TablasConfig(
  Id uniqueidentifier NOT NULL PRIMARY KEY,
  TableName nvarchar(260) NOT NULL,
- Tipo int NOT NULL,
+ Fuente nvarchar(100) NOT NULL,
  DisplayName nvarchar(200) NULL,
+ SerialColumn nvarchar(200) NULL,
+ DateColumn nvarchar(200) NULL,
  CreatedAtUtc datetime2 NOT NULL DEFAULT SYSUTCDATETIME(),
  UpdatedAtUtc datetime2 NULL
 );
+IF COL_LENGTH('dbo.SXA_RTX_TablasConfig','Fuente') IS NULL ALTER TABLE dbo.SXA_RTX_TablasConfig ADD Fuente nvarchar(100) NULL;
+IF COL_LENGTH('dbo.SXA_RTX_TablasConfig','DisplayName') IS NULL ALTER TABLE dbo.SXA_RTX_TablasConfig ADD DisplayName nvarchar(200) NULL;
+IF COL_LENGTH('dbo.SXA_RTX_TablasConfig','SerialColumn') IS NULL ALTER TABLE dbo.SXA_RTX_TablasConfig ADD SerialColumn nvarchar(200) NULL;
+IF COL_LENGTH('dbo.SXA_RTX_TablasConfig','DateColumn') IS NULL ALTER TABLE dbo.SXA_RTX_TablasConfig ADD DateColumn nvarchar(200) NULL;
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_SXA_RTX_TablasConfig_TableName' AND object_id=OBJECT_ID('dbo.SXA_RTX_TablasConfig'))
 CREATE UNIQUE INDEX IX_SXA_RTX_TablasConfig_TableName ON dbo.SXA_RTX_TablasConfig(TableName);";
 
@@ -98,12 +104,14 @@ CREATE TABLE dbo.SXA_RTX_TablaColumnas(
  Id uniqueidentifier NOT NULL PRIMARY KEY,
  TablaConfigId uniqueidentifier NOT NULL,
  ColumnName nvarchar(200) NOT NULL,
+ DisplayName nvarchar(200) NULL,
  CreatedAtUtc datetime2 NOT NULL DEFAULT SYSUTCDATETIME(),
  UpdatedAtUtc datetime2 NULL
 );
 CREATE UNIQUE INDEX IX_SXA_RTX_TablaColumnas_TablaCol ON dbo.SXA_RTX_TablaColumnas(TablaConfigId, ColumnName);
 ALTER TABLE dbo.SXA_RTX_TablaColumnas ADD CONSTRAINT FK_SXA_RTX_TablaColumnas_TablasConfig FOREIGN KEY (TablaConfigId) REFERENCES dbo.SXA_RTX_TablasConfig(Id) ON DELETE CASCADE;
-END";
+END
+IF COL_LENGTH('dbo.SXA_RTX_TablaColumnas','DisplayName') IS NULL ALTER TABLE dbo.SXA_RTX_TablaColumnas ADD DisplayName nvarchar(200) NULL;";
 
     private const string CreateUsers = @"
 IF OBJECT_ID('dbo.SXA_RTX_Users','U') IS NULL

@@ -35,11 +35,33 @@ public interface ITablasConfigService
 }
 
 /// <summary>
-/// Configuración visual de una tabla operacional: Tipo (VTI/VTech), título amigable
-/// (DisplayName; null = mostrar el nombre SQL) y columnas visibles (vacío = todas).
+/// Configuración visual de una tabla operacional: Fuente (aplicación que la escribe),
+/// título amigable, columnas de serie/fecha para trazabilidad y columnas con nickname.
 /// </summary>
 public sealed record TablaConfigDto(
     string TableName,
-    EquipoTipo Tipo,
+    string Fuente,
     string? DisplayName,
-    IReadOnlyList<string> VisibleColumns);
+    string? SerialColumn,
+    string? DateColumn,
+    IReadOnlyList<TablaColumnaDto> Columnas);
+
+/// <summary>Columna configurada: nombre real en SQL + nickname visible (null = nombre real).</summary>
+public sealed record TablaColumnaDto(string ColumnName, string? DisplayName);
+
+/// <summary>Evento de trazabilidad de una tabla para un número de serie.</summary>
+public sealed record TraceEventDto(
+    string Fuente,
+    string TableName,
+    string TableDisplayName,
+    DateTime? OccurredAt,
+    IReadOnlyDictionary<string, string?> Values);
+
+/// <summary>Especificación de una tabla para la búsqueda de trazabilidad.</summary>
+public sealed record TraceTableSpec(
+    string TableName,
+    string Fuente,
+    string TableDisplayName,
+    string SerialColumn,
+    string DateColumn,
+    IReadOnlyList<string> Columns);
