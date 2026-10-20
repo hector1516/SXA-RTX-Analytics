@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Actualizador automatico de SXA-RTX Analytics.
 
@@ -22,6 +22,9 @@
 .PARAMETER AppPoolName
   Nombre del App Pool de IIS (por defecto SXA-RTX-Analytics).
 
+.PARAMETER Port
+  Puerto HTTP de la aplicación (por defecto 5000), usado para /health/live.
+
 .PARAMETER Repo
   Repositorio GitHub "owner/repo".
 
@@ -37,6 +40,7 @@ param(
   [string]$Mode = "Service",
   [string]$ServiceName = "SXA-RTX-Analytics",
   [string]$AppPoolName = "SXA-RTX-Analytics",
+  [int]$Port = 5000,
   [string]$Repo = "hector1516/SXA-RTX-Analytics",
   [switch]$DryRun,
   [switch]$KeepBackup
@@ -112,6 +116,44 @@ try {
     throw
   }
 
+  # Preservar la configuración local (SQLite) y los overrides de producción.
+  $backupData = Join-Path $backup "data"
+  if (Test-Path $backupData) {
+    $items = Get-ChildItem -LiteralPath $backupData -Force -ErrorAction SilentlyContinue
+    if ($items) {
+      $destData = Join-Path $InstallPath "data"
+      New-Item -ItemType Directory -Force -Path $destData | Out-Null
+      Copy-Item -Path (Join-Path $backupData '*') -Destination $destData -Recurse -Force
+      Write-Step "Configuración local (data) preservada."
+    }
+  }
+  $backupProd = Join-Path $backup "appsettings.Production.json"
+  if (Test-Path $backupProd) {
+    Copy-Item -LiteralPath $backupProd -Destination (Join-Path $InstallPath "appsettings.Production.json") -Force
+    Write-Step "appsettings.Production.json preservado."
+  }
+
+  # La carpeta nueva viene del ZIP: restaurar permisos del App Pool.
+  if ($Mode -eq "IIS") {
+    try {
+      $identity = "IIS AppPool\$AppPoolName"
+      $acl = Get-Acl -LiteralPath $InstallPath
+      $acl.SetAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
+        $identity, "ReadAndExecute", "ContainerInherit,ObjectInherit", "None", "Allow")))
+      Set-Acl -LiteralPath $InstallPath -AclObject $acl
+
+      foreach ($sub in @('data', 'logs')) {
+        $dir = Join-Path $InstallPath $sub
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        $sacl = Get-Acl -LiteralPath $dir
+        $sacl.SetAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
+          $identity, "Modify", "ContainerInherit,ObjectInherit", "None", "Allow")))
+        Set-Acl -LiteralPath $dir -AclObject $sacl
+      }
+      Write-Step "Permisos del App Pool restaurados."
+    } catch { Write-Step "ADVERTENCIA: no se pudieron restaurar permisos del App Pool: $($_.Exception.Message)" }
+  }
+
   if ($Mode -eq "Service") {
     & sc.exe start $ServiceName | Out-Null
     Write-Step "Servicio reiniciado."
@@ -123,7 +165,7 @@ try {
   # Verificar salud
   Start-Sleep -Seconds 5
   try {
-    $health = Invoke-WebRequest -Uri "http://localhost:5000/health/live" -UseBasicParsing -TimeoutSec 15
+    $health = Invoke-WebRequest -Uri "http://localhost:$Port/health/live" -UseBasicParsing -TimeoutSec 15
     if ($health.Content -match "Healthy") {
       Write-Step "OK: /health/live responde Healthy"
       if (-not $KeepBackup) { Remove-Item -Recurse -Force $backup -ErrorAction SilentlyContinue; Write-Step "Backup eliminado" }

@@ -1,6 +1,9 @@
-# DEPLOYMENT — SXA-RTX Analytics (IIS)
+﻿# DEPLOYMENT - SXA-RTX Analytics (IIS / Servicio)
 
-> Fase 1 no incluye instalador. Este documento describe el despliegue manual esperado.
+
+> El instalador (`Setup_SXA_RTX_Analytics_*.exe`) automatiza requisitos, IIS o servicio,
+> permisos, firewall, configuración inicial y verificación de salud. Las secciones manuales
+> quedan como referencia y diagnóstico.
 
 ## Requisitos del servidor
 
@@ -10,6 +13,31 @@
   - Tras instalar, `iisreset` o reiniciar.
 - SQL Server accesible (para `SXA_RTX_Analytics`). Puede ser instancia local o remota.
 - Cuenta de servicio / identidad de App Pool con acceso a la base y a la carpeta de la app.
+
+## Instalación automática (recomendada)
+
+1. Descargar `Setup_SXA_RTX_Analytics_vX.Y.Z.exe` del release y ejecutarlo **como Administrador**.
+2. El instalador:
+   - Detecta IIS. Si existe: instala features (`Web-Server`, `Web-WebSockets`), crea el App Pool
+     (No Managed Code, AlwaysRunning, Load User Profile) y el sitio en `http://localhost:5000`.
+     Si no hay IIS: registra el servicio de Windows con reinicio ante fallos.
+   - Instala el **ASP.NET Core Hosting Bundle 10** si falta (winget) y ejecuta `iisreset` si aplica.
+   - Crea `data` y `logs` y ajusta permisos del App Pool: lectura/ejecución en la app y
+     **Modify solo en `data` y `logs`**.
+   - Abre el puerto en el firewall.
+   - Inicializa la configuración (`--ensure-db`) y registra la tarea de actualización (cada hora).
+   - Verifica `/health/live` y avisa si no responde `Healthy`.
+3. Entrar a `http://servidor:5000` con `ECCSA` / `Qwe123456` y cambiarla.
+4. Configurar la conexión SQL (solo lectura) en **Configuración → SQL Server**.
+
+Opciones del script (`installer\install.ps1`):
+
+| Parámetro | Uso |
+| --- | --- |
+| `-Port 8080` | Otro puerto (también se usa en la tarea de actualización). |
+| `-DryRun` | Muestra todo sin cambiar nada. |
+| `-SkipPrereqs` | No intenta instalar features ni el Hosting Bundle (servidor sin internet). |
+| `-ForceIis` | Fuerza modo IIS si la detección falla. |
 
 ## Publicación
 
@@ -94,7 +122,8 @@ El instalador registra una tarea de Windows (`SXA-RTX-Analytics-Updater`) que ej
 3. Extrae a una carpeta temporal y valida que contenga el ejecutable.
 4. Hace backup de la carpeta actual, detiene el servicio / recicla el App Pool, reemplaza los
    archivos y reinicia.
-5. Verifica `http://localhost:5000/health/live` → `Healthy`. Si falla, conserva el backup.
+5. Verifica `http://localhost:${Port}/health/live` → `Healthy`. Si falla, conserva el backup.
+6. **Preserva `data` (configuración SQLite) y `appsettings.Production.json`** y restaura los permisos del App Pool tras reemplazar la carpeta.
 
 Se puede forzar en cualquier momento:
 
