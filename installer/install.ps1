@@ -30,12 +30,15 @@
 #>
 param(
   [string]$InstallPath = "C:\Program Files\SXA-RTX Analytics",
-  [ValidateSet("install","uninstall")]
+  [ValidateSet("install","uninstall","diagnose")]
   [string]$Mode = "install",
   [int]$Port = 5000,
   [switch]$DryRun,
   [switch]$SkipPrereqs,
-  [switch]$ForceIis
+  [switch]$ForceIis,
+  [switch]$Diagnose,
+  [string]$WindowsSource = "",
+  [string]$PrereqsPath = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -44,6 +47,7 @@ $SiteName     = "SXA-RTX-Analytics"
 $AppPoolName  = "SXA-RTX-Analytics"
 $ServiceName  = "SXA-RTX-Analytics"
 $TaskName     = "SXA-RTX-Analytics-Updater"
+$MyAppExeName = "SXA.RTX.Analytics.Web.exe"
 $FirewallRule = "SXA-RTX Analytics"
 $script:NeedIisReset = $false
 $script:LogFile = Join-Path $env:TEMP "sxa-rtx-install.log"
@@ -81,16 +85,55 @@ function Test-AspNetCoreRuntime {
   } catch { return $false }
 }
 
+function Resolve-PrereqsPath {
+  if ($PrereqsPath -and (Test-Path $PrereqsPath)) { return $PrereqsPath }
+  $candidates = @(
+    (Join-Path (Split-Path -Parent $PSCommandPath) "prereqs"),
+    (Join-Path $InstallPath "prereqs")
+  )
+  foreach ($c in $candidates) { if (Test-Path $c) { return $c } }
+  return $null
+}
+
+function Find-HostingBundleInstaller {
+  $dir = Resolve-PrereqsPath
+  if (-not $dir) { return $null }
+  $files = Get-ChildItem -LiteralPath $dir -Filter "*HostingBundle*.exe" -ErrorAction SilentlyContinue
+  if (-not $files) { $files = Get-ChildItem -LiteralPath $dir -Filter "dotnet-hosting-*.exe" -ErrorAction SilentlyContinue }
+  if ($files) { return ($files | Select-Object -First 1).FullName }
+  return $null
+}
+
 function Ensure-AspNetCoreRuntime {
   if (Test-AspNetCoreRuntime) { Write-Step "ASP.NET Core 10 detectado."; return }
-  Invoke-Step "Instalando ASP.NET Core Hosting Bundle 10 (winget)" {
-    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-      throw "Falta ASP.NET Core Hosting Bundle 10 y winget no está disponible. Instálalo desde https://dotnet.microsoft.com/download/dotnet/10.0 y vuelve a ejecutar."
+
+  $local = Find-HostingBundleInstaller
+  if ($local) {
+    Invoke-Step "Instalando ASP.NET Core Hosting Bundle 10 desde prereq local: $local" {
+      $p = Start-Process -FilePath $local -ArgumentList "/quiet /norestart" -Wait -PassThru
+      if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { throw "Instalador local fallo (codigo $($p.ExitCode))." }
+      if (-not (Test-AspNetCoreRuntime)) { throw "El instalador local termino pero el runtime 10 no se detecta." }
+      $script:NeedIisReset = $true
     }
-    & winget install --id Microsoft.DotNet.HostingBundle.10 -e --silent --source winget --accept-package-agreements --accept-source-agreements --disable-interactivity
-    if (-not (Test-AspNetCoreRuntime)) {
-      throw "No se pudo instalar el Hosting Bundle (winget código $LASTEXITCODE). Instálalo manualmente y reintenta."
+    return
+  }
+
+  if (Get-Command winget -ErrorAction SilentlyContinue) {
+    Invoke-Step "Instalando ASP.NET Core Hosting Bundle 10 (winget)" {
+      & winget install --id Microsoft.DotNet.HostingBundle.10 -e --silent --source winget --accept-package-agreements --accept-source-agreements --disable-interactivity
+      if (-not (Test-AspNetCoreRuntime)) { throw "No se pudo instalar el Hosting Bundle (winget codigo $LASTEXITCODE)." }
+      $script:NeedIisReset = $true
     }
+    return
+  }
+
+  Invoke-Step "Descargando ASP.NET Core Hosting Bundle 10 desde Microsoft" {
+    $tmp = Join-Path $env:TEMP "dotnet-hosting-10.exe"
+    $url = "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/10.0.0/dotnet-hosting-10.0.0-win.exe"
+    try { Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing } catch { throw "No se pudo descargar el Hosting Bundle: $($_.Exception.Message). Colocalo en la carpeta prereqs." }
+    $p = Start-Process -FilePath $tmp -ArgumentList "/quiet /norestart" -Wait -PassThru
+    if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { throw "Instalador descargado fallo (codigo $($p.ExitCode))." }
+    if (-not (Test-AspNetCoreRuntime)) { throw "Descarga termino pero el runtime 10 no se detecta." }
     $script:NeedIisReset = $true
   }
 }
@@ -105,8 +148,25 @@ function Ensure-IISFeatures {
     -not ($f -and $f.Installed)
   }
   if (-not $need) { Write-Step "Features IIS OK (Web-Server, Web-WebSockets)."; return }
+
+  $sourceArgs = @{}
+  if ($WindowsSource -and (Test-Path $WindowsSource)) {
+    $sourceArgs['Source'] = $WindowsSource
+    Write-Step "Usando fuente de Windows: $WindowsSource"
+  }
+
   Invoke-Step "Instalando features IIS: $($need -join ', ')" {
-    Install-WindowsFeature -Name $need -IncludeManagementTools | Out-Null
+    try {
+      Install-WindowsFeature -Name $need -IncludeManagementTools @sourceArgs | Out-Null
+    } catch {
+      Write-Step "Install-WindowsFeature fallo: $($_.Exception.Message). Intentando con DISM..."
+      foreach ($feat in $need) {
+        $dismArgs = @("/online","/enable-feature","/featurename:$feat","/all","/NoRestart")
+        if ($WindowsSource) { $dismArgs += "/source:$WindowsSource" }
+        & dism.exe @dismArgs | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "DISM fallo para $feat (codigo $LASTEXITCODE). Proporciona -WindowsSource con la carpeta sources\sxs del ISO de Windows Server." }
+      }
+    }
     $script:NeedIisReset = $true
   }
 }
@@ -166,6 +226,16 @@ function Install-IIS {
 
   Grant-AppPoolAccess
   Set-FirewallRule
+
+  Invoke-Step "Verificando que el App Pool arranca" {
+    Start-WebAppPool -Name $AppPoolName -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    $state = (Get-WebAppPoolState -Name $AppPoolName).Value
+    Write-Step "Estado del App Pool: $state"
+    if ($state -ne "Started") {
+      throw "El App Pool no arranco (estado=$state). Revisa que el Hosting Bundle 10 este instalado y que la identidad tenga permisos."
+    }
+  }
 }
 
 function Install-Service {
@@ -283,6 +353,38 @@ function Uninstall {
 
 try {
   Write-Step "SXA-RTX Analytics - modo=$Mode puerto=$Port dryRun=$DryRun"
+
+  if ($Diagnose -or $Mode -eq "diagnose") {
+    Write-Step "=== DIAGNOSTICO ==="
+    Write-Step "Runtime .NET:"
+    try { & dotnet --list-runtimes 2>&1 | ForEach-Object { Write-Step "  $_" } } catch { Write-Step "  dotnet no disponible" }
+    Write-Step "Servicio W3SVC:"
+    $svc = Get-Service W3SVC -ErrorAction SilentlyContinue
+    Write-Step "  $(if ($svc) { $svc.Status } else { 'NO instalado' })"
+    Write-Step "IIS features:"
+    foreach ($f in @('Web-Server','Web-WebSockets')) {
+      try { $fi = Get-WindowsFeature -Name $f -ErrorAction Stop; Write-Step "  $f = $($fi.Installed)" } catch { Write-Step "  $f = n/a (no WindowsFeature)" }
+    }
+    Write-Step "Sitio IIS:"
+    try {
+      Import-Module WebAdministration -ErrorAction Stop
+      $ws = Get-Website -Name $SiteName -ErrorAction SilentlyContinue
+      Write-Step "  $(if ($ws) { "Existe: $($ws.State) en $($ws.bindings.Collection.bindingInformation)" } else { 'NO existe' })"
+      $ap = Get-WebAppPoolState -Name $AppPoolName -ErrorAction SilentlyContinue
+      Write-Step "  AppPool: $(if ($ap) { $ap.Value } else { 'NO existe' })"
+    } catch { Write-Step "  WebAdministration no disponible: $($_.Exception.Message)" }
+    Write-Step "Puerto ${Port}:"
+    $listeners = netstat -ano 2>$null | Select-String ":$Port\s"
+    if ($listeners) { $listeners | ForEach-Object { Write-Step "  $_" } } else { Write-Step "  No hay listener en $Port" }
+    Write-Step "Archivos de la app:"
+    Write-Step "  InstallPath=$InstallPath (existe=$(Test-Path $InstallPath))"
+    Write-Step "  exe=$($exe = Join-Path $InstallPath $MyAppExeName 2>$null; Test-Path $exe)"
+    Write-Step "  data=$((Test-Path (Join-Path $InstallPath 'data'))) logs=$((Test-Path (Join-Path $InstallPath 'logs')))"
+    Write-Step "  prereqs=$PrereqsPath"
+    Write-Step "=== FIN DIAGNOSTICO ==="
+    exit 0
+  }
+
   if (-not $DryRun -and -not (Test-Admin)) { throw "Ejecuta este script como Administrador." }
 
   if ($Mode -eq "uninstall") { Uninstall; exit 0 }

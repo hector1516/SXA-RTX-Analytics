@@ -49,3 +49,6 @@ coverage/
 !**/*.nupkg
 
 # SXA-RTX Analytics: never commit real connection strings, passwords, tokens
+
+# Offline prereqs (binarios grandes, se generan con tools/prepare-offline.ps1)
+installer/prereqs/*.exe

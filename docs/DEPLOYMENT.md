@@ -163,6 +163,37 @@ producción con SQL Server real, si no hay administrador activo y no se configur
 - `GET /health` — JSON completo (útil para diagnóstico y balanceadores)
 - `GET /health/live` — texto plano `Healthy`/`Unhealthy` (liveness probe ligera)
 
+## Instalación offline / autocontenida
+
+Para servidores sin internet (Windows Server 2022 Standard), genera un instalador autocontenido:
+
+1. En una máquina con internet, descarga los prerequisitos:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File tools\prepare-offline.ps1
+   ```
+   Esto deja `installer\prereqs\dotnet-hosting-10.0.0-win.exe`.
+2. Recompila el instalador:
+   ```powershell
+   iscc /DMyAppVersion=1.4.3 installer\Analytics.iss
+   ```
+   El instalador resultante incluye el Hosting Bundle y se instala sin internet.
+3. En el servidor, si IIS no está instalado y no hay fuente de Windows, instala las features primero con el ISO:
+   ```powershell
+   Install-WindowsFeature Web-Server,Web-WebSockets -IncludeManagementTools -Source D:\sources\sxs
+   ```
+   o pasa la fuente al instalador:
+   ```powershell
+   .\install.ps1 -WindowsSource D:\sources\sxs
+   ```
+
+## Diagnóstico
+
+Si la app no responde tras instalar, ejecuta:
+```powershell
+.\install.ps1 -Diagnose
+```
+Imprime estado de runtime .NET, IIS, App Pool, puerto, archivos y prereqs. El log completo está en `%TEMP%\sxa-rtx-install.log` y los logs de la app en `<InstallPath>\logs\`.
+
 ## Troubleshooting
 
 | Síntoma | Causa probable |
