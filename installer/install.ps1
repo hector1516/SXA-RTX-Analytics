@@ -224,6 +224,9 @@ function Install-IIS {
     New-Website -Name $SiteName -PhysicalPath $InstallPath -ApplicationPool $AppPoolName -Port $Port -Force | Out-Null
   }
 
+  Invoke-Step "Desbloqueando archivos (quitar Mark-of-the-Web)" {
+    Get-ChildItem -LiteralPath $InstallPath -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object { Unblock-File -LiteralPath $_.FullName -ErrorAction SilentlyContinue }
+  }
   Grant-AppPoolAccess
   Set-FirewallRule
 
@@ -240,6 +243,9 @@ function Install-IIS {
 
 function Install-Service {
   $exe = Join-Path $InstallPath "SXA.RTX.Analytics.Web.exe"
+  Invoke-Step "Desbloqueando archivos (quitar Mark-of-the-Web)" {
+    Get-ChildItem -LiteralPath $InstallPath -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object { Unblock-File -LiteralPath $_.FullName -ErrorAction SilentlyContinue }
+  }
   Invoke-Step "Registrando servicio Windows $ServiceName (automático, con reinicio ante fallo)" {
     if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
       Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
@@ -250,6 +256,16 @@ function Install-Service {
       -DisplayName "SXA-RTX Analytics" -StartupType Automatic | Out-Null
     & sc.exe failure $ServiceName reset= 86400 actions= restart/60000/restart/60000/restart/60000 | Out-Null
     Start-Service -Name $ServiceName
+    Start-Sleep -Seconds 3
+    $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+    if (-not $svc -or $svc.Status -ne 'Running') {
+      $err = ""
+      try {
+        $ev = Get-WinEvent -FilterHashtable @{ LogName='Application' } -MaxEvents 5 -ErrorAction SilentlyContinue
+        if ($ev) { $err = ($ev | Select-Object -First 3 | ForEach-Object { $_.Message }) -join " | " }
+      } catch { }
+      throw "El servicio no arranco (estado=$($svc.Status)). $err"
+    }
   }
   Set-FirewallRule
 }
@@ -357,6 +373,14 @@ try {
   if ($Diagnose -or $Mode -eq "diagnose") {
     Write-Step "=== DIAGNOSTICO ==="
     Write-Step "Runtime .NET:"
+    try {
+      $dg = Get-CimInstance -ClassName Win32_DeviceGuard -Namespace root\Microsoft\Windows\DeviceGuard -ErrorAction Stop
+      Write-Step "  WDAC CodeIntegrity enforcement: $($dg.CodeIntegrityPolicyEnforcementStatus) (2=enforced)"
+      Write-Step "  WDAC UserMode enforcement: $($dg.UsermodeCodeIntegrityPolicyEnforcementStatus) (2=enforced)"
+      if ($dg.CodeIntegrityPolicyEnforcementStatus -eq 2 -or $dg.UsermodeCodeIntegrityPolicyEnforcementStatus -eq 2) {
+        Write-Step "  AVISO: WDAC activo. Los assemblies no firmados pueden ser bloqueados (error 0x800711C7)."
+      }
+    } catch { Write-Step "  WDAC: no disponible" }
     try { & dotnet --list-runtimes 2>&1 | ForEach-Object { Write-Step "  $_" } } catch { Write-Step "  dotnet no disponible" }
     Write-Step "Servicio W3SVC:"
     $svc = Get-Service W3SVC -ErrorAction SilentlyContinue

@@ -20,7 +20,7 @@ builder.Host.UseSerilog((ctx, services, cfg) =>
        .Enrich.FromLogContext()
        .Enrich.WithProperty("Application", "SXA.RTX.Analytics")
        .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
-       .WriteTo.File(path: "logs/sxa-rtx-analytics-.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 14,
+       .WriteTo.File(path: Path.Combine(AppContext.BaseDirectory, "logs", "sxa-rtx-analytics-.log"), rollingInterval: RollingInterval.Day, retainedFileCountLimit: 14,
             outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}");
 });
 
