@@ -249,10 +249,29 @@ function Install-Service {
   Invoke-Step "Registrando servicio Windows $ServiceName (automático, con reinicio ante fallo)" {
     if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
       Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
-      & sc.exe delete $ServiceName | Out-Null
+      $delOut = & sc.exe delete $ServiceName 2>&1
+      Write-Step "  sc delete: $($delOut -join ' ')"
       Start-Sleep -Seconds 2
     }
-    & sc.exe create $ServiceName binPath= "`"$exe`" --urls http://0.0.0.0:$Port" DisplayName= "SXA-RTX Analytics" start= auto | Out-Null
+    $createOut = & sc.exe create $ServiceName binPath= "`"$exe`" --urls http://0.0.0.0:$Port" DisplayName= "SXA-RTX Analytics" start= auto 2>&1
+    Write-Step "  sc create: $($createOut -join ' ')"
+    if ($LASTEXITCODE -ne 0) {
+      Write-Step "  sc create fallo (codigo $LASTEXITCODE). Verificando si el servicio ya existe..."
+      $existingSvc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+      if ($existingSvc) {
+        Write-Step "  El servicio ya existe (estado=$($existingSvc.Status)). Actualizando binPath..."
+        & sc.exe config $ServiceName binPath= "`"$exe`" --urls http://0.0.0.0:$Port" 2>&1 | Out-Null
+        & sc.exe config $ServiceName start= auto 2>&1 | Out-Null
+      } else {
+        Write-Step "  Intentando con New-Service..."
+        try {
+          New-Service -Name $ServiceName -BinaryPathName "`"$exe`" --urls http://0.0.0.0:$Port" -DisplayName "SXA-RTX Analytics" -StartupType Automatic -ErrorAction Stop | Out-Null
+          Write-Step "  New-Service OK"
+        } catch {
+          throw "No se pudo crear el servicio: $($_.Exception.Message)"
+        }
+      }
+    }
     & sc.exe config $ServiceName obj= "LocalSystem" | Out-Null
     & sc.exe failure $ServiceName reset= 86400 actions= restart/60000/restart/60000/restart/60000 | Out-Null
     Start-Service -Name $ServiceName
@@ -368,7 +387,8 @@ function Uninstall {
   if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
     Invoke-Step "Deteniendo y eliminando el servicio $ServiceName" {
       Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
-      & sc.exe delete $ServiceName | Out-Null
+      $delOut = & sc.exe delete $ServiceName 2>&1
+      Write-Step "  sc delete: $($delOut -join ' ')"
     }
   }
   if (Test-IsIIS) {
