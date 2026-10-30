@@ -66,7 +66,13 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
+// Solo redirigir a HTTPS si hay un puerto HTTPS configurado (evita el warning
+// "Failed to determine the https port for redirect" en modo servicio/IIS sin TLS).
+if (!string.IsNullOrEmpty(builder.Configuration["ASPNETCORE_HTTPS_PORT"]) ||
+    !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_HTTPS_PORT")))
+{
+    app.UseHttpsRedirection();
+}
 app.UseAntiforgery();
 app.UseAuthentication();
 app.UseAuthorization();

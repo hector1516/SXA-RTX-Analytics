@@ -252,8 +252,8 @@ function Install-Service {
       & sc.exe delete $ServiceName | Out-Null
       Start-Sleep -Seconds 2
     }
-    New-Service -Name $ServiceName -BinaryPathName "`"$exe`" --urls http://0.0.0.0:$Port" `
-      -DisplayName "SXA-RTX Analytics" -StartupType Automatic | Out-Null
+    & sc.exe create $ServiceName binPath= "`"$exe`" --urls http://0.0.0.0:$Port" DisplayName= "SXA-RTX Analytics" start= auto | Out-Null
+    & sc.exe config $ServiceName obj= "LocalSystem" | Out-Null
     & sc.exe failure $ServiceName reset= 86400 actions= restart/60000/restart/60000/restart/60000 | Out-Null
     Start-Service -Name $ServiceName
     Start-Sleep -Seconds 3
@@ -329,6 +329,22 @@ function Register-Updater([string]$runtimeMode) {
   $tr = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$updater`" -InstallPath `"$InstallPath`" -Mode $runtimeMode -Port $Port"
   Invoke-Step "Registrando tarea $TaskName (cada hora)" {
     & schtasks /Create /TN $TaskName /SC HOURLY /RU SYSTEM /RL HIGHEST /F /TR $tr | Out-Null
+  }
+}
+
+function New-DesktopShortcut {
+  param([string]$Url = "http://localhost:$Port")
+  $shortcutName = "SXA-RTX Analytics.url"
+  $content = "[InternetShortcut]`r`nURL=$Url`r`nIconIndex=0`r`n"
+  $targets = @()
+  try { $targets += Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) $shortcutName } catch { }
+  try { $targets += Join-Path ([Environment]::GetFolderPath("Desktop")) $shortcutName } catch { }
+  foreach ($t in $targets) {
+    if (-not $t) { continue }
+    try {
+      Set-Content -LiteralPath $t -Value $content -Encoding ASCII
+      Write-Step "Acceso directo creado: $t"
+    } catch { Write-Step "No se pudo crear acceso directo en $t : $($_.Exception.Message)" }
   }
 }
 
@@ -429,7 +445,6 @@ try {
   if ($isIis) { Install-IIS } else { Install-Service }
 
   Invoke-EnsureDb
-  Write-FirstLoginNote
   Register-Updater $(if ($isIis) { "IIS" } else { "Service" })
 
   if ($script:NeedIisReset -and -not $DryRun) {
@@ -437,9 +452,13 @@ try {
     & iisreset /noforce | Out-Null
   }
 
+  New-DesktopShortcut -Url "http://localhost:$Port"
   $healthy = Wait-Healthy
   if ($healthy) {
     Write-Step "Instalación completada. Abre http://localhost:$Port - usuario inicial ECCSA / Qwe123456 (cámbialo)."
+    Write-Step "Credenciales iniciales guardadas en $InstallPath\PRIMER-INGRESO.txt"
+    Write-FirstLoginNote
+    try { Start-Process "http://localhost:$Port" } catch { }
   } else {
     Write-Step "Instalación copiada, pero la verificación falló. Revisa $InstallPath\logs, el Visor de eventos y /configuration."
   }
