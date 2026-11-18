@@ -54,7 +54,7 @@ public sealed class TraceService : ITraceService
                 }
 
                 // 1) Leer el registro padre.
-                var parents = new List<(IReadOnlyDictionary<string, string?> Values, DateTime? Date, string? Key)>();
+                var parents = new List<(IReadOnlyDictionary<string, string?> Values, DateTime? Date, List<string?> Keys)>();
                 using (var conn = SqlProbe.Create(connectionString))
                 {
                     await conn.OpenAsync(ct);
@@ -78,23 +78,31 @@ public sealed class TraceService : ITraceService
                             if (dateCol is not null && string.Equals(names[i], t.DateColumn, StringComparison.OrdinalIgnoreCase))
                                 occurred = ToDate(raw);
                         }
-                        string? key = null;
-                        if (detalle is not null && !string.IsNullOrWhiteSpace(detalle.ParentKey))
-                            values.TryGetValue(detalle.ParentKey!, out key);
-                        parents.Add((values, occurred, key));
+                        var parentKeys = new List<string?>();
+                        if (detalle is not null)
+                        {
+                            if (!string.IsNullOrWhiteSpace(detalle.ParentKey) && values.TryGetValue(detalle.ParentKey!, out var sk))
+                                parentKeys.Add(sk);
+                            if (detalle.ParentKeys is not null)
+                                foreach (var pk in detalle.ParentKeys)
+                                    if (!string.IsNullOrWhiteSpace(pk) && values.TryGetValue(pk, out var mk))
+                                        parentKeys.Add(mk);
+                        }
+                        parents.Add((values, occurred, parentKeys));
                     }
                 }
 
                 // 2) Leer el detalle relacionado (resultados de pruebas).
                 var detailsByKey = new Dictionary<string, List<IReadOnlyDictionary<string, string?>>>(StringComparer.OrdinalIgnoreCase);
                 if (detalle is not null && !string.IsNullOrWhiteSpace(detalle.Table) && !string.IsNullOrWhiteSpace(detalle.ForeignKey))
-                    detailsByKey = await LoadDetailsAsync(connectionString, detalle, parents.Select(p => p.Key), ct);
+                    detailsByKey = await LoadDetailsAsync(connectionString, detalle, parents.SelectMany(p => p.Keys), ct);
 
                 // 3) Construir los eventos con su detalle.
                 foreach (var p in parents)
                 {
                     List<IReadOnlyDictionary<string, string?>>? detail = null;
-                    if (p.Key is not null && detailsByKey.TryGetValue(p.Key, out var list)) detail = list;
+                    foreach (var k in p.Keys)
+                        if (!string.IsNullOrWhiteSpace(k) && detailsByKey.TryGetValue(k, out var list)) { detail = list; break; }
                     events.Add(new TraceEventDto(t.Fuente, t.TableName, t.TableDisplayName, p.Date, p.Values, detail));
                 }
             }
@@ -146,6 +154,9 @@ public sealed class TraceService : ITraceService
     {
         if (table.Contains("VTi_UutRecords", StringComparison.OrdinalIgnoreCase))
             return new TablaDetalleDto("dbo.VTi_UutRecordDetails", "UutRecordID", "ID", "DateTime", "Test", "Result", "Value", "Units");
+        if (table.Contains("VTech_ProductionTrace", StringComparison.OrdinalIgnoreCase))
+            return new TablaDetalleDto("dbo.VTech_CircuitsResult", "CircuitBarcode", null, "DateTime", null, "ChargeResult", "Quantity", null,
+                new[] { "Circuit1Barcode", "Circuit2Barcode", "Circuit3Barcode" });
         return null;
     }
 

@@ -63,7 +63,8 @@ public sealed record TablaDetalleDto(
     string? TitleColumn,
     string? ResultColumn,
     string? ValueColumn,
-    string? UnitsColumn);
+    string? UnitsColumn,
+    IReadOnlyList<string>? ParentKeys = null);
 
 /// <summary>Evento de trazabilidad de una tabla para un número de serie.</summary>
 public sealed record TraceEventDto(

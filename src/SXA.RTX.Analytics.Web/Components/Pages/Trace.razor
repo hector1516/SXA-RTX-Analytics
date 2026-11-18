@@ -221,7 +221,7 @@
             ConnStr = ds.EffectiveOperationalConnectionString ?? "";
             Configs = (await TablasService.GetConfigAsync()).ToList();
             Specs = Configs
-                .Where(c => !string.IsNullOrWhiteSpace(c.SerialColumn) && !string.IsNullOrWhiteSpace(c.DateColumn))
+                .Where(c => !string.IsNullOrWhiteSpace(c.SerialColumn))
                 .Select(c => new TraceTableSpec(
                     c.TableName,
                     c.Fuente,
