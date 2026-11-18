@@ -43,6 +43,27 @@ public sealed class ConfigSeeder
                 ("dbo.VTi_UutRecordDetails", "UutRecordID", "ID", "DateTime", "Test", "Result", "Value", "Units")),
             ("[dbo].[VTech_ProductionTrace]", "VTech",      "Trazabilidad VTech",    "Serial",        null,       null),
             ("[dbo].[VTech_CircuitsResult]",  "VTech",      "Resultados de circuitos VTech", "CircuitBarcode", "DateTime", null),
+            ("[dbo].[Alarms_Data]",           "Alarmas",    "Datos de alarmas",          null,            null,       null),
+            ("[dbo].[PackoutErr]",           "Packout",    "Errores de packout",        null,            null,       null),
+            ("[dbo].[CabecerasErr]",         "Cabeceras",  "Errores de cabecera",       null,            null,       null),
+            ("[dbo].[CajasEErr]",            "Cajas",      "Errores de cajas",          null,            null,       null),
+            ("[dbo].[Caseline_Control]",     "Producción", "Control de línea",          null,            null,       null),
+            ("[dbo].[DG_BOTTOM]",            "Producción", "DG Bottom",                 null,            null,       null),
+            ("[dbo].[Production_Chart]",     "Producción", "Gráfica de producción",    null,            null,       null),
+            ("[dbo].[Production_Data]",      "Producción", "Datos de producción",       null,            null,       null),
+            ("[dbo].[nomenclatures]",       "Catálogos",  "Nomenclaturas",             null,            null,       null),
+            ("[dbo].[recipe_table]",         "Catálogos",  "Recetas",                   null,            null,       null),
+            ("[dbo].[VTi_UutDefects]",      "VTI",        "Defectos VTI",              null,            null,       null),
+            ("[dbo].[VTi_Models]",          "VTI",        "Modelos VTI",               null,            null,       null),
+            ("[dbo].[VTi_ModelParameters]", "VTI",        "Parámetros VTI",            null,            null,       null),
+            ("[dbo].[VTech_ChargeRecipies]", "VTech",     "Recetas de carga VTech",    null,            null,       null),
+            ("[dbo].[VTech_VacuumRecipies]", "VTech",     "Recetas de vacío VTech",    null,            null,       null),
+            ("[dbo].[VTech_LeakPoints]",    "VTech",      "Puntos de fuga VTech",      null,            null,       null),
+            ("[dbo].[VTech_VacuumPoint]",   "VTech",      "Puntos de vacío VTech",     null,            null,       null),
+            ("[dbo].[VTech_Recipies]",      "VTech",      "Recetas VTech",             null,            null,       null),
+            ("[dbo].[log_table]",           "Producción", "Log de línea",              "Serial_Number", "Start_Date", null),
+            ("[dbo].[inline_table]",        "Producción", "Log inline",                "Serial_Number", "Start_Date", null),
+            ("[dbo].[txt_file_table]",      "Producción", "Log de archivo",            "Serial_Number", "Start_Date", null),
         };
 
         foreach (var t in tablas)
@@ -102,6 +123,13 @@ public sealed class ConfigSeeder
             ("[dbo].[PackoutResultados]", "FechaHora", "Fecha"),
             ("[dbo].[PackoutResultados]", "Resultado", "Resultado"),
             ("[dbo].[PackoutResultados]", "Operador", "Operador"),
+            ("[dbo].[log_table]", "Serial_Number", "Serie"),
+            ("[dbo].[log_table]", "Start_Date", "Fecha"),
+            ("[dbo].[log_table]", "Station", "Estación"),
+            ("[dbo].[inline_table]", "Serial_Number", "Serie"),
+            ("[dbo].[inline_table]", "Start_Date", "Fecha"),
+            ("[dbo].[txt_file_table]", "Serial_Number", "Serie"),
+            ("[dbo].[txt_file_table]", "Start_Date", "Fecha"),
         };
 
         var byTable = await _db.Set<TablaConfig>().ToDictionaryAsync(x => x.TableName, StringComparer.OrdinalIgnoreCase, ct);
