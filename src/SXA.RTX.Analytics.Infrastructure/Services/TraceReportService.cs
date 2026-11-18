@@ -288,9 +288,21 @@ public sealed class TraceReportService : ITraceReportService
         {
             foreach (var row in e.Details)
             {
-                var result = Val(row, detail.ResultColumn);
-                var failed = result.Contains("fail", StringComparison.OrdinalIgnoreCase)
+                var rawResult = Val(row, detail.ResultColumn);
+                bool failed;
+                string result;
+                // VTech usa ChargeResult (SMALLINT): 0 = fallido, !=0 = aprobado.
+                if (int.TryParse(rawResult, out var numResult))
+                {
+                    failed = numResult == 0;
+                    result = failed ? "Fallido" : "Aprobado";
+                }
+                else
+                {
+                    result = rawResult;
+                    failed = result.Contains("fail", StringComparison.OrdinalIgnoreCase)
                              || result.Contains("fall", StringComparison.OrdinalIgnoreCase);
+                }
                 tests.Add(new TestRow(
                     Trim(Val(row, detail.DateColumn), 19),
                     Val(row, detail.TitleColumn),
