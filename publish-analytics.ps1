@@ -1,7 +1,8 @@
 param(
   [string]$Version = "1.0.0",
   [switch]$SkipInstaller,
-  [switch]$SkipRestore
+  [switch]$SkipRestore,
+  [switch]$UploadRelease
 )
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
@@ -39,6 +40,35 @@ if ($SkipInstaller) {
     if ($LASTEXITCODE -ne 0) { Write-Warning "ISCC devolvio codigo $LASTEXITCODE (revisar log de Inno). Continua con el publish." }
   } else {
     Write-Warning "ISCC no encontrado - solo publish en artifacts\publish. Instala Inno Setup 6 para generar el EXE."
+  }
+}
+
+# Generar ZIP de publicacion (para auto-actualizacion)
+$zipPath = "artifacts\SXA-RTX-Analytics-v$Version-publish.zip"
+if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+Write-Host "Comprimiendo artifacts\publish en $zipPath ..."
+Compress-Archive -Path "artifacts\publish\*" -DestinationPath $zipPath -CompressionLevel Optimal
+$zipSize = [math]::Round((Get-Item $zipPath).Length / 1MB, 1)
+Write-Host "ZIP generado: $zipPath ($zipSize MB)"
+
+# Subir a GitHub Release si se solicita
+if ($UploadRelease) {
+  $gh = Get-Command gh -ErrorAction SilentlyContinue
+  if (-not $gh) {
+    Write-Warning "gh (GitHub CLI) no encontrado. Sube manualmente los archivos al release."
+  } else {
+    $tag = "v$Version"
+    $installerPath = "artifacts\pkg\Setup_SXA_RTX_Analytics_v$Version.exe"
+    Write-Host "Creando release $tag en GitHub..."
+    & $gh.Source release create $tag $installerPath $zipPath --title "SXA-RTX Analytics $Version" --notes "Release $Version" 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+      Write-Host "Release $tag creado con installer y ZIP."
+    } else {
+      # El release puede ya existir; intentar subir assets
+      & $gh.Source release upload $tag $installerPath $zipPath --clobber 2>&1 | Out-Null
+      if ($LASTEXITCODE -eq 0) { Write-Host "Assets subidos al release $tag." }
+      else { Write-Warning "No se pudo subir al release. Revisa gh auth status." }
+    }
   }
 }
 

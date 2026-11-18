@@ -96,6 +96,40 @@ Salida en `publish/` (no versionar). Contiene `web.config` generado para IIS.
    - App: `logs/sxa-rtx-analytics-*.log` (Serilog file sink, rolling diario, 14 días)
    - IIS: `%SystemDrive%\inetpub\logs\LogFiles\`
 
+## Publicación de releases (requisito para auto-actualización)
+
+Cada release en GitHub **debe incluir dos archivos** para que la auto-actualización funcione:
+
+1. **`Setup_SXA_RTX_Analytics_vX.Y.Z.exe`** — instalador autocontenido (Inno Setup).
+2. **`SXA-RTX-Analytics-vX.Y.Z-publish.zip`** — ZIP de la carpeta `artifacts/publish` (lo busca el actualizador).
+
+### Flujo automatizado (recomendado)
+```powershell
+# Todo en un solo comando: build, publish, installer, ZIP y subida a GitHub
+powershell -ExecutionPolicy Bypass -File publish-analytics.ps1 -Version X.Y.Z -UploadRelease
+```
+Requisitos: `dotnet` (.NET 10 SDK), `iscc` (Inno Setup 6) y `gh` (GitHub CLI) autenticado.
+
+### Flujo manual
+```powershell
+# 1. Build + publish + installer
+powershell -ExecutionPolicy Bypass -File publish-analytics.ps1 -Version X.Y.Z
+
+# 2. Generar ZIP de publicación
+Compress-Archive -Path "artifacts\publish\*" -DestinationPath "artifacts\SXA-RTX-Analytics-vX.Y.Z-publish.zip" -CompressionLevel Optimal
+
+# 3. Subir ambos archivos al release
+gh release create vX.Y.Z "artifacts\pkg\Setup_SXA_RTX_Analytics_vX.Y.Z.exe" "artifacts\SXA-RTX-Analytics-vX.Y.Z-publish.zip" --title "SXA-RTX Analytics X.Y.Z" --notes "..."
+```
+
+### Verificación post-publicación
+```powershell
+gh release view vX.Y.Z
+# Debe listar ambos archivos: .exe y -publish.zip
+```
+
+> **Importante:** si solo se publica el `.exe`, los servidores existentes no se actualizarán automáticamente porque el actualizador busca el `.zip` de publicación.
+
 ## Actualización
 
 1. Descargar el instalador o el ZIP del release desde
