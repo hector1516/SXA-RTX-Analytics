@@ -1,0 +1,149 @@
+@page "/charts"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using ApexCharts
+@using SXA.RTX.Analytics.Application.Abstractions
+@inject IDashboardService DashboardService
+@inject IDataSourceService DataSources
+@inject ITablasConfigService TablasService
+
+<PageTitle>Gráficas - SXA-RTX Analytics</PageTitle>
+
+<div class="rx-page-head">
+    <div>
+        <div class="rx-eyebrow">Visualización</div>
+        <h1>Gráficas de actividad</h1>
+        <div class="text-muted small">Actividad por día y distribución por fuente (últimos 14 días).</div>
+    </div>
+</div>
+
+@if (IsLoading)
+{
+    <div class="text-center py-5"><div class="spinner-border"></div></div>
+}
+else if (Snapshot is null)
+{
+    <div class="card"><div class="card-body text-center text-muted py-5">
+        <div>No hay datos disponibles. Verifica la conexión SQL en Configuración.</div>
+    </div></div>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-12 col-lg-8">
+            <div class="card">
+                <div class="card-header"><strong>Actividad por día</strong></div>
+                <div class="card-body">
+                    <ApexChart TItem="ActivityPoint" Title="Registros por día" Options="barOptions">
+                        <ApexPointSeries TItem="ActivityPoint"
+                                         Items="ActivityData"
+                                         Name="Registros"
+                                         SeriesType="SeriesType.Bar"
+                                         XValue="@(e => e.Day)"
+                                         YValue="@(e => e.Count)" />
+                    </ApexChart>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-4">
+            <div class="card">
+                <div class="card-header"><strong>Registros por fuente</strong></div>
+                <div class="card-body">
+                    <ApexChart TItem="SourceSlice" Title="Distribución" Options="donutOptions">
+                        <ApexPointSeries TItem="SourceSlice"
+                                         Items="SourceData"
+                                         Name="Registros"
+                                         SeriesType="SeriesType.Donut"
+                                         XValue="@(e => e.Source)"
+                                         YValue="@(e => e.Count)" />
+                    </ApexChart>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (Snapshot.Tables.Count > 0)
+    {
+        <div class="card mt-3">
+            <div class="card-header"><strong>Resumen por tabla</strong></div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead class="table-light">
+                            <tr><th>Tabla</th><th>Fuente</th><th class="text-end">Total</th><th class="text-end">Recientes (14d)</th><th>Última fecha</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var t in Snapshot.Tables)
+                            {
+                                <tr>
+                                    <td class="small font-monospace">@t.TableName</td>
+                                    <td class="small">@t.Fuente</td>
+                                    <td class="text-end">@t.TotalCount</td>
+                                    <td class="text-end">@t.RecentCount</td>
+                                    <td class="small">@(t.LastDate?.ToString("yyyy-MM-dd HH:mm") ?? "-")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    bool IsLoading = true;
+    DashboardSnapshotDto? Snapshot;
+    List<ActivityPoint> ActivityData = new();
+    List<SourceSlice> SourceData = new();
+    ApexChartOptions<ActivityPoint> barOptions = new();
+    ApexChartOptions<SourceSlice> donutOptions = new();
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    async Task Load()
+    {
+        IsLoading = true;
+        try
+        {
+            var ds = await DataSources.GetAsync();
+            var cs = ds.EffectiveOperationalConnectionString;
+            var tabs = await TablasService.GetConfigAsync();
+            Snapshot = await DashboardService.GetSnapshotAsync(cs, tabs, 14, 20);
+
+            if (Snapshot?.Activity is not null)
+            {
+                ActivityData = Snapshot.Activity
+                    .Select(a => new ActivityPoint(a.Day, a.Count))
+                    .ToList();
+            }
+
+            if (Snapshot?.Tables is not null)
+            {
+                SourceData = Snapshot.Tables
+                    .GroupBy(t => string.IsNullOrWhiteSpace(t.Fuente) ? "Sin fuente" : t.Fuente!)
+                    .Select(g => new SourceSlice(g.Key, g.Sum(t => t.TotalCount)))
+                    .OrderByDescending(s => s.Count)
+                    .ToList();
+            }
+
+            barOptions = new ApexChartOptions<ActivityPoint>
+            {
+                Chart = new Chart { Type = ChartType.Bar, Toolbar = new Toolbar { Show = false } },
+                Colors = new List<string> { "#0071E3" },
+                Xaxis = new XAxis { Labels = new XAxisLabels { Rotate = -45 } }
+            };
+
+            donutOptions = new ApexChartOptions<SourceSlice>
+            {
+                Chart = new Chart { Type = ChartType.Donut },
+                Legend = new Legend { Position = LegendPosition.Bottom }
+            };
+        }
+        catch (Exception) { Snapshot = null; }
+        finally { IsLoading = false; }
+    }
+
+    public sealed record ActivityPoint(string Day, int Count);
+    public sealed record SourceSlice(string Source, int Count);
+}
