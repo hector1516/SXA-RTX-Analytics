@@ -32,6 +32,8 @@ public interface ITablasConfigService
     Task<IReadOnlyList<string>> ListAllTablesAsync(string? sqlConnectionString, CancellationToken ct = default);
     Task<IReadOnlyList<TablaConfigDto>> GetConfigAsync(CancellationToken ct = default);
     Task<(bool Success, string Message)> SaveAsync(IReadOnlyList<TablaConfigDto> selections, CancellationToken ct = default);
+    string SuggestFuente(string tableName);
+    Task<IReadOnlyList<TablaConfigDto>> ScanTablesAsync(string? sqlConnectionString, CancellationToken ct = default);
 }
 
 /// <summary>

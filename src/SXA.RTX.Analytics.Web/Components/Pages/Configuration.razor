@@ -162,6 +162,7 @@ else if (ActiveTab == 4)
             <p class="text-muted small">Marca las tablas que usa Analytics, asígnalas a una <strong>fuente</strong> (VTI, Packout, Cajas, Producción...), ponles título y nickname a las columnas, e indica qué columna es el <strong>número de serie</strong> y cuál la <strong>fecha</strong> (para la línea de tiempo).</p>
             <div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
                 <button class="btn btn-outline-secondary btn-sm" @onclick="LoadTablas" disabled="@IsLoadingTablas">@if (IsLoadingTablas) { <span class="spinner-border spinner-border-sm"></span> } else { @("Cargar tablas") }</button>
+                <button class="btn btn-outline-info btn-sm" @onclick="ScanTablas" disabled="@IsLoadingTablas">@if (IsLoadingTablas) { <span class="spinner-border spinner-border-sm"></span> } else { @("Detectar tablas") }</button>
                 <button class="btn btn-primary btn-sm" @onclick="SaveTablas" disabled="@IsSavingTablas">Guardar</button>
                 <span class="text-muted small ms-1">@SelectedCount() tabla(s) seleccionada(s)</span>
             </div>
@@ -404,6 +405,26 @@ else if (ActiveTab == 5)
         }
         foreach (var t in AllTables) Edit(t);
     } finally { IsLoadingTablas=false; } }
+
+    async Task ScanTablas(){ IsLoadingTablas=true; try {
+        var suggested = await TablasService.ScanTablesAsync(BuildSqlConnectionStringReal());
+        AllTables = suggested.Select(s => s.TableName).ToList();
+        Edits = new Dictionary<string, TableEdit>(StringComparer.OrdinalIgnoreCase);
+        foreach (var s in suggested)
+        {
+            var e = new TableEdit { Used = true, Fuente = s.Fuente ?? "Sin clasificar", Title = s.DisplayName ?? "", Serial = s.SerialColumn ?? "", DateCol = s.DateColumn ?? "" };
+            foreach (var col in s.Columnas)
+            {
+                e.Columns.Add(new ColumnInfo(col.ColumnName, "", true));
+                e.Visible.Add(col.ColumnName);
+                if (!string.IsNullOrWhiteSpace(col.DisplayName)) e.Nicks[col.ColumnName] = col.DisplayName!;
+            }
+            Edits[s.TableName] = e;
+        }
+        TablasMsg = $"Detectadas {suggested.Count} tablas. Revisa y ajusta antes de guardar.";
+        TablasOk = true;
+    } catch(Exception ex){ TablasOk=false; TablasMsg="No se pudo escanear: "+ex.Message; }
+    finally { IsLoadingTablas=false; } }
 
     async Task LoadColumns(string t){
         LoadingColumns.Add(t);

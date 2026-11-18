@@ -138,6 +138,85 @@ public sealed class TablasConfigService : ITablasConfigService
             .ToList();
     }
 
+    public string SuggestFuente(string tableName)
+    {
+        var t = (tableName ?? "").Trim().ToLowerInvariant();
+        // Quitar esquema y corchetes
+        var name = t.Replace("[", "").Replace("]", "").Split('.').LastOrDefault()?.Trim() ?? t;
+        if (name.StartsWith("vti_")) return "VTI";
+        if (name.StartsWith("vtech_")) return "VTech";
+        if (name.StartsWith("cabeceras")) return "Cabeceras";
+        if (name.StartsWith("cajas")) return "Cajas";
+        if (name.StartsWith("packout")) return "Packout";
+        if (name.StartsWith("alarms")) return "Alarmas";
+        if (name is "report" or "foam_reports" or "oven_reports" or "press_reports" or "kuka_reports"
+            or "toolchange_reports" or "workstations_reports" or "reportsfoam" or "reportscycle"
+            or "caseline_control" or "dg_bottom" or "production_chart" or "production_data")
+            return "Producción";
+        if (name is "log_table" or "inline_table" or "txt_file_table") return "Logs";
+        if (name is "nomenclatures" or "recipe_table") return "Catálogos";
+        if (name.StartsWith("vti") || name.StartsWith("vtech")) return name.StartsWith("vti") ? "VTI" : "VTech";
+        return "Sin clasificar";
+    }
+
+    public async Task<IReadOnlyList<TablaConfigDto>> ScanTablesAsync(string? sqlConnectionString, CancellationToken ct = default)
+    {
+        var result = new List<TablaConfigDto>();
+        if (string.IsNullOrWhiteSpace(sqlConnectionString)) return result;
+        try
+        {
+            using var conn = SqlProbe.Create(sqlConnectionString);
+            await conn.OpenAsync(ct);
+            // Listar tablas
+            using var cmd = new SqlCommand(
+                "SELECT TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA='dbo' ORDER BY TABLE_NAME", conn);
+            using var r = await cmd.ExecuteReaderAsync(ct);
+            var tables = new List<(string Schema, string Name)>();
+            while (await r.ReadAsync(ct))
+                tables.Add((r.GetString(0), r.GetString(1)));
+            await r.CloseAsync();
+
+            foreach (var (schema, name) in tables)
+            {
+                var full = $"[{schema}].[{name}]";
+                if (name.StartsWith("SXA_RTX_", StringComparison.OrdinalIgnoreCase)) continue; // skip config tables
+                if (name.StartsWith("sys", StringComparison.OrdinalIgnoreCase)) continue;
+
+                // Obtener columnas
+                using var cmdCol = new SqlCommand(
+                    "SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@s AND TABLE_NAME=@t ORDER BY ORDINAL_POSITION", conn);
+                cmdCol.Parameters.Add(new SqlParameter("@s", schema));
+                cmdCol.Parameters.Add(new SqlParameter("@t", name));
+                using var rCol = await cmdCol.ExecuteReaderAsync(ct);
+                var cols = new List<(string Name, string Type)>();
+                while (await rCol.ReadAsync(ct))
+                    cols.Add((rCol.GetString(0), rCol.GetString(1)));
+                await rCol.CloseAsync();
+
+                // Sugerir SerialColumn y DateColumn por heurística
+                string? serialCol = null, dateCol = null;
+                foreach (var (colName, colType) in cols)
+                {
+                    var lower = colName.ToLowerInvariant();
+                    if (serialCol is null && (lower.Contains("serial") || lower == "serie" || lower.Contains("serialnum")))
+                        serialCol = colName;
+                    if (dateCol is null && (lower.Contains("date") || lower.Contains("fecha") || lower == "datetime"
+                        || lower.Contains("time") && !lower.Contains("timeout")))
+                        dateCol = colName;
+                }
+
+                var fuente = SuggestFuente(name);
+                var columns = cols.Select(c => new TablaColumnaDto(c.Name, null)).ToList();
+                result.Add(new TablaConfigDto(full, fuente, name, serialCol, dateCol, columns, null));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "No se pudo escanear tablas");
+        }
+        return result;
+    }
+
     public async Task<(bool Success, string Message)> SaveAsync(IReadOnlyList<TablaConfigDto> selections, CancellationToken ct = default)
     {
         try
