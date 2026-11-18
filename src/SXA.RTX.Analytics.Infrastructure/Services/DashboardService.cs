@@ -29,7 +29,7 @@ public sealed class DashboardService : IDashboardService
 
         var cutoff = DateTime.Now.Date.AddDays(-(days - 1)).ToString("yyyy-MM-dd");
         var active = tables
-            .Where(t => !string.IsNullOrWhiteSpace(t.TableName) && !string.IsNullOrWhiteSpace(t.DateColumn))
+            .Where(t => !string.IsNullOrWhiteSpace(t.TableName))
             .ToList();
 
         var tableRows = new List<TableActivityDto>();
@@ -41,8 +41,19 @@ public sealed class DashboardService : IDashboardService
             try
             {
                 var tableSql = QuoteTable(t.TableName);
-                var dateCol = QuoteIdent(t.DateColumn!);
                 var display = string.IsNullOrWhiteSpace(t.DisplayName) ? t.TableName : t.DisplayName!;
+
+                if (string.IsNullOrWhiteSpace(t.DateColumn))
+                {
+                    // Tablas sin columna de fecha (ej. VTech_ProductionTrace): solo total.
+                    var totalOnly = await QueryRowsAsync(connectionString,
+                        $"SELECT COUNT(*) AS total FROM {tableSql}", _ => { }, ct);
+                    var tot = Convert.ToInt32(totalOnly.FirstOrDefault()?[0] ?? 0);
+                    tableRows.Add(new TableActivityDto(t.TableName, display, t.Fuente, null, 0, tot));
+                    continue;
+                }
+
+                var dateCol = QuoteIdent(t.DateColumn!);
 
                 // Última fecha + conteo reciente + total (una sola pasada, comparación por cadena).
                 var agg = await QueryRowsAsync(connectionString,

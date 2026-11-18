@@ -279,6 +279,9 @@ public sealed class TraceReportService : ITraceReportService
         var detail = cfg?.Detalle;
         if (detail is null && e.TableName.Contains("VTi_UutRecords", StringComparison.OrdinalIgnoreCase))
             detail = new TablaDetalleDto("dbo.VTi_UutRecordDetails", "UutRecordID", "ID", "DateTime", "Test", "Result", "Value", "Units");
+        if (detail is null && e.TableName.Contains("VTech_ProductionTrace", StringComparison.OrdinalIgnoreCase))
+            detail = new TablaDetalleDto("dbo.VTech_CircuitsResult", "CircuitBarcode", null, "DateTime", null, "ChargeResult", "Quantity", null,
+                new[] { "Circuit1Barcode", "Circuit2Barcode", "Circuit3Barcode" });
 
         var tests = new List<TestRow>();
         if (e.Details is { Count: > 0 } && detail is not null)
